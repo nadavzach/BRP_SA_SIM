@@ -1,0 +1,239 @@
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <torch/torch.h>
+#include "grid.cpp"
+
+using namespace std;
+
+struct tile_idx {
+    uint32_t d1;
+    uint32_t d2;
+    uint32_t d3;
+};
+
+template <typename T>
+class smt_sa {
+private:
+    uint16_t _dim;
+    uint8_t _threads;
+    uint16_t _max_depth;
+    torch::Tensor _a;
+    torch::Tensor _b;
+
+    void _subtile_dict(vector<uint16_t> &subtile_start, vector<uint16_t> &subtile_end);
+    void _subtile_range(uint8_t thread, uint16_t &thread_tile_start, uint16_t &thread_tile_end);
+
+public:
+    grid<T> sa_grid;
+    uint64_t cycles;
+
+    smt_sa (uint16_t dim, uint8_t threads, uint16_t max_depth=4096);
+
+    void set_inputs(torch::Tensor a, torch::Tensor b);
+    void get_tile(vector<torch::Tensor> &tile_a, vector<torch::Tensor> &tile_b, tile_idx t_idx);
+    torch::Tensor go();
+    torch::Tensor go(vector<tile_idx> &tile_vec);
+};
+
+template <typename T>
+smt_sa<T>::smt_sa (uint16_t dim, uint8_t threads, uint16_t max_depth) : _dim(dim), _threads(threads), _max_depth(max_depth), sa_grid(dim, threads, max_depth), cycles(0) {}
+
+template <typename T>
+void smt_sa<T>::set_inputs(torch::Tensor a, torch::Tensor b) {
+    //assert(a.shape().size() == 3);
+    //assert(b.shape().size() == 2);
+    assert(a.size(2) == b.size(0));
+
+    _a = a;
+    _b = b; 
+}
+
+template <typename T>
+void smt_sa<T>::get_tile(vector<torch::Tensor> &tile_a, vector<torch::Tensor> &tile_b, tile_idx t_idx) {
+    uint16_t a_tile_H = _dim;
+    uint16_t b_tile_W = _dim;
+
+    vector<uint16_t> subtile_start;
+    vector<uint16_t> subtile_end;
+    _subtile_dict(subtile_start, subtile_end);
+
+    for (uint8_t t=0; t<_threads; t++) {
+        torch::Tensor tile = _a;
+        tile = tile.narrow(1, t_idx.d2 * a_tile_H, (t_idx.d2+1)*a_tile_H);
+        tile = tile.narrow(2, subtile_start[t], subtile_end[t]);
+        tile = tile.select(0, t_idx.d1);
+        //torch::Tensor tile = xt::view(_a, t_idx.d1, xt::range(t_idx.d2 * a_tile_H, (t_idx.d2+1)*a_tile_H), xt::range(subtile_start[t], subtile_end[t]));
+        tile_a.push_back(tile);
+
+        if (_dim > tile_a[t].size(0)) {
+            //tile_a[t] = xt::pad(tile_a[t], {{0, _dim - tile_a[t].size(0)}, {0, 0}});
+            tile_a[t] = torch::nn::functional::pad(tile_a[t], torch::nn::functional::PadFuncOptions({0, _dim - tile_a[t].size(0), 0, 0}));
+        }
+    }
+
+    for (uint8_t t=0; t<_threads; t++) {
+        torch::Tensor tile = _b;
+        tile = tile.narrow(0, subtile_start[t], subtile_end[t]);
+        tile = tile.narrow(1, t_idx.d3*b_tile_W, (t_idx.d3+1)*b_tile_W);
+        //torch::Tensor tile = xt::view(_b, xt::range(subtile_start[t], subtile_end[t]), xt::range(t_idx.d3*b_tile_W, (t_idx.d3+1)*b_tile_W));
+        tile_b.push_back(tile);
+
+        if (_dim > tile_b[t].size(1)) {
+            //tile_b[t] = xt::pad(tile_b[t], {{0, 0}, {0, _dim - tile_b[t].size(1)}});
+            tile_a[t] = torch::nn::functional::pad(tile_b[t], torch::nn::functional::PadFuncOptions({0, 0, 0, _dim - tile_b[t].size(1)}));
+        }
+    }
+
+}
+
+template <typename T>
+void smt_sa<T>::_subtile_dict(vector<uint16_t> &subtile_start, vector<uint16_t> &subtile_end) {
+    for (uint8_t t=0; t<_threads; t++) {
+        uint16_t start, end;
+        _subtile_range(t, start, end);
+        subtile_start.push_back(start);
+        subtile_end.push_back(end);
+    }
+}
+
+template <typename T>
+void smt_sa<T>::_subtile_range(uint8_t thread, uint16_t &thread_tile_start, uint16_t &thread_tile_end) {
+    uint16_t a_tile_W = _a.size(2);
+    uint16_t b_tile_H = _b.size(0);
+    assert(a_tile_W == b_tile_H);
+
+    uint16_t subtile_size = floor(float(b_tile_H) / _threads);
+
+    if (thread < _threads - 1) {
+        thread_tile_start = thread * subtile_size;
+        thread_tile_end = (thread+1) * subtile_size;
+    }
+    else {
+        thread_tile_start = thread * subtile_size;
+        thread_tile_end = b_tile_H;
+    }
+}
+
+template <typename T>
+torch::Tensor smt_sa<T>::go(vector<tile_idx> &tile_vec) {
+    assert(tile_vec.size() > 0);
+    uint16_t a_tiles = ceil(float(_a.size(1)) / _dim);
+    uint16_t b_tiles = ceil(float(_b.size(1)) / _dim);
+
+    // Assuming tile_vec is ordered (batch, height, width), i.e., rows->columns->depth!
+    torch::Tensor array_ctrl = torch::ones({_dim, _dim});
+    torch::Scalar _init_val = int((tile_vec[0].d1 * a_tiles * b_tiles) + (tile_vec[0].d2 * b_tiles) + (tile_vec[0].d3));
+    array_ctrl = at::mul(array_ctrl, _init_val);
+
+    uint32_t global_tile_idx = 1;
+    vector<torch::Tensor> tile_a, tile_b;
+    get_tile(tile_a, tile_b, tile_vec[0]);
+    for (uint8_t t=0; t<_threads; t++)
+        sa_grid.push(tile_a[t], tile_b[t], t, true);
+
+    torch::Tensor result = torch::zeros({_a.size(0), _a.size(1), _b.size(1)});
+
+    vector<uint16_t> subtile_start, subtile_end;
+    _subtile_dict(subtile_start, subtile_end);
+
+    uint32_t computed = 0;
+    uint32_t while_end = tile_vec.size() * _dim * _dim;
+
+    while (computed < while_end) {
+        sa_grid.cycle();
+        cycles++;
+
+        for (uint16_t i=0; i<_dim; i++) {
+            for (uint16_t j=0; j<_dim; j++) {
+                uint8_t halt_count = 0;
+
+                for (uint8_t t=0; t<_threads; t++) {
+                    if (sa_grid.nodes[i][j].is_halt(t))
+                        halt_count++;
+
+                    uint32_t acc_t = sa_grid.nodes[i][j].get_acc_t(t);
+
+                    assert(subtile_end[t] - subtile_start[t] >= 0);
+
+                    if ((acc_t == uint32_t(subtile_end[t] - subtile_start[t])) && !sa_grid.nodes[i][j].is_halt(t))
+                        sa_grid.nodes[i][j].halt(t);
+                }
+
+                if (halt_count == _threads) {
+                    uint32_t batch = floor(float(array_ctrl[i][j].item<int>() / (a_tiles * b_tiles)));
+                    uint32_t i_result = int(i + int((array_ctrl[i][j].item<int>() % (a_tiles * b_tiles)) / b_tiles) * _dim);
+                    uint32_t j_result = int(j + ((array_ctrl[i][j].item<int>() % (a_tiles * b_tiles)) % b_tiles) * _dim);
+
+                    if (i_result < result.size(1) && j_result < result.size(2))
+                        result[batch][i_result][j_result] = sa_grid.nodes[i][j].get_acc();
+                    
+                    array_ctrl[i][j] = array_ctrl[i][j] + 1;
+                    sa_grid.nodes[i][j].reset_acc();
+                    sa_grid.nodes[i][j].reset_acc_t();
+                    computed++;
+                    //cout << computed << "/" << while_end << endl;
+
+
+                    sa_grid.nodes[i][j].release();
+                }
+            }
+        }
+
+        if (sa_grid.mem_a[0]._buf[0].size() < 128) {
+            if (global_tile_idx < tile_vec.size()) {
+                //cout << "!!!" << global_tile_idx << "/" << tile_vec.size() << endl;
+                get_tile(tile_a, tile_b, tile_vec[global_tile_idx]);
+
+                for (uint8_t t=0; t<_threads; t++)
+                    sa_grid.push(tile_a[t], tile_b[t], t);
+
+                global_tile_idx++;
+            }
+        }
+    }
+
+    return result;
+}
+
+template <typename T>
+torch::Tensor smt_sa<T>::go() {
+    uint16_t batch = _a.size(0);
+    uint16_t a_tiles = ceil(float(_a.size(1)) / _dim);
+    uint16_t b_tiles = ceil(float(_b.size(1)) / _dim);
+
+    torch::Tensor result = torch::zeros({_a.size(0), _a.size(1), _b.size(1)});
+    vector<tile_idx> tile_vec;
+
+    for (uint16_t b=0; b<batch; b++) {
+        for (uint16_t i=0; i<a_tiles; i++) {
+            for (uint16_t j=0; j<b_tiles; j++) {
+                tile_idx t_idx;
+                t_idx.d1 = b;
+                t_idx.d2 = i;
+                t_idx.d3 = j;
+                tile_vec.push_back(t_idx);
+
+                //cout << b << " " << i << " " << j << endl;
+            }
+        }
+    }
+    
+    result += go(tile_vec);
+
+    return result;
+}
+
+int main()
+{
+    //grid<float> sa(2,1);
+    smt_sa<float> sa(16, 2);
+
+    torch::Tensor a = torch::randn({4, 128, 512});
+    torch::Tensor b = torch::randn({512, 128});
+    sa.set_inputs(a, b);
+    torch::Tensor result = sa.go();
+    cout << result << endl;
+
+    return 0;
+}
