@@ -226,19 +226,19 @@ void node_pu<T>::go() {
 	}
 	
  	for (uint8_t i=0; i<_alu_num; i++) {
-		cout<<" alu arr["<<(unsigned int)i<<"]= "<<alu_ocp_arr[i]<<"\n";
+		//cout<<" alu arr["<<(unsigned int)i<<"]= "<<alu_ocp_arr[i]<<"\n";
 	}
 
- 	for (uint8_t t=0; t<_threads; t++) {
-		if(th_valid_arr[t]) {
-			cout<<" threads op arr["<<(unsigned int)t<<"]= "<<th_op_arr[t]<<"\n";
-			cout<<" a["<<(unsigned int)t<<"]= "<<(T)a[t]<<"\n";
-			cout<<" b["<<(unsigned int)t<<"]= "<<(T)b[t]<<"\n";
-		} else
-		{
-			cout<<" at least one of the node args is empty"<<"\n";
-		}
-	}
+ 	//for (uint8_t t=0; t<_threads; t++) {
+	//	if(th_valid_arr[t]) {
+	//		cout<<" threads op arr["<<(unsigned int)t<<"]= "<<th_op_arr[t]<<"\n";
+	//		cout<<" a["<<(unsigned int)t<<"]= "<<(T)a[t]<<"\n";
+	//		cout<<" b["<<(unsigned int)t<<"]= "<<(T)b[t]<<"\n";
+	//	} else
+	//	{
+	//		cout<<" at least one of the node args is empty"<<"\n";
+	//	}
+	//}
 }
 
 

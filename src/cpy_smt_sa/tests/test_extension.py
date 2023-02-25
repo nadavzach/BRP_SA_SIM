@@ -8,6 +8,7 @@ class ExampleTest(TestCase):
 
    
     def test_example1(self):
+        np.random.seed(0)
         dim = 3
         threads = 2
         alu_num = 1
@@ -19,14 +20,19 @@ class ExampleTest(TestCase):
 
         b_w = a_d 
         b_h = 5 
-        a = np.ones((a_w,a_h,a_d))#np.random.randint(0,100,size = (a_w,a_h,a_d))
-        b = np.ones((b_w,b_h ) )#np.random.randint(0,100,size = (b_w,b_h))
+        a = np.random.randint(0,255,size = (a_w,a_h,a_d))
+        b = np.random.randint(0,255,size = (b_w,b_h))
+
+        a_mask = np.random.randint(0,2,size = (a_w,a_h,a_d))
+        b_mask = np.random.randint(0,2,size = (b_w,b_h))
+        a=np.multiply(a,a_mask)
+        b=np.multiply(b,b_mask)
         print("a array: \n")
         print(a)
         print("b array: \n")
         print(b)
-        print("running first test with run_int64:")
-        result = m.run_int32(dim,threads,alu_num,max_depth,a,b)
+        print("running first test with run_int8:")
+        result = m.run_uint8(dim,threads,alu_num,max_depth,a,b)
         print("finished test, result - \n")
         print(result.astype(np.uint))
 

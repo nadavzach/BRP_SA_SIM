@@ -146,7 +146,7 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec) {
                         halt_count++;
 
                     uint32_t acc_t = sa_grid.nodes[i][j].get_acc_t(t);
-                    std::cout<<"thread: "<<(unsigned int)t<<" node: "<<i<<", "<<j<<" acc_t: "<<acc_t<<std::endl; // DEBUG
+//                    std::cout<<"thread: "<<(unsigned int)t<<" node: "<<i<<", "<<j<<" acc_t: "<<acc_t<<std::endl; // DEBUG
                     //Ssleep(1); // DEBUG
                     assert(subtile_end[t] - subtile_start[t] >= 0);
 
