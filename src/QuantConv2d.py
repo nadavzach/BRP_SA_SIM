@@ -156,6 +156,8 @@ class UnfoldConv2d(nn.Module):
         self._reset_stats(self.stats)
 
     def forward(self, x):
+
+        x = x.type(torch.uint8)
         self.stats['inputs'] += x.size(0)
 
         # Prepare activations, weights, and bias
@@ -173,10 +175,12 @@ class UnfoldConv2d(nn.Module):
                     ((self.running_min_mean * num_inputs_tracked_tag) + min_sum) / self.num_inputs_tracked
 
             # These statistics are mandatory for quantization
-            assert (self.running_max_mean != 0 or self.running_min_mean != 0)
+                assert (self.running_max_mean != 0 or self.running_min_mean != 0)
 
             # Activations quantization
             # Currently only supports unsigned uniform quantization
+            #print("$$$$$$$$$$$$ x min is: " + str(torch.min(x)))
+            #print(torch.min(x).type())
             if torch.min(x) == 0:
                 x_q, x_q_delta = uniform_quantization(x, self.running_max_mean, self._x_bits)
 
@@ -218,7 +222,7 @@ class UnfoldConv2d(nn.Module):
             x_q, x_q_delta = x, 1
             weight_q, weight_q_delta =\
                 self.conv.weight * self.conv_mask.weight.data if self._prune is True else self.conv.weight,\
-                torch.tensor([1]).cuda()
+                torch.tensor([1])#.cuda()
             bias_fp = self.conv.bias
 
         if not self._unfold:

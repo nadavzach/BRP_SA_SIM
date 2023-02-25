@@ -40,8 +40,8 @@ class NeuralNet:
 
         # self.parallel_model = torch.nn.DataParallel(self.model).cuda(self.device)
         # Disabled parallel model. Statistics collection does not support GPU parallelism.
-        self.parallel_model = self.model.cuda(self.device)
-        self.criterion = torch.nn.CrossEntropyLoss().cuda(self.device)
+        self.parallel_model = self.model#.cuda(self.device)
+        self.criterion = torch.nn.CrossEntropyLoss()#.cuda(self.device)
 
         self.optimizer = None
         self.lr_plan = None
@@ -66,8 +66,8 @@ class NeuralNet:
         with torch.no_grad():
             end = time.time()
             for i, (input, target) in enumerate(test_gen):
-                input = input.cuda(self.device, non_blocking=True)
-                target = target.cuda(self.device, non_blocking=True)
+                input = input#.cuda(self.device, non_blocking=True)
+                target = target#.cuda(self.device, non_blocking=True)
 
                 # Compute output
                 output = self.parallel_model(input)
@@ -116,7 +116,7 @@ class NeuralNet:
             else:
                 self._train_step(train_gen, epoch, self.optimizer, iterations=iterations)
 
-            torch.cuda.empty_cache()
+            torch.empty_cache()#.cuda.empty_cache()
             top1_acc = self.test(test_gen).item()
 
             if top1_acc > self.best_top1_acc:
@@ -145,8 +145,8 @@ class NeuralNet:
             # measure data loading time
             data_time.update(time.time() - end)
 
-            input = input.cuda(self.device, non_blocking=True)
-            target = target.cuda(self.device, non_blocking=True)
+            input = input#.cuda(self.device, non_blocking=True)
+            target = target#.cuda(self.device, non_blocking=True)
 
             # Compute output
             output = self.parallel_model(input)
@@ -307,7 +307,7 @@ class NeuralNet:
 
             res = []
             for k in topk:
-                correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+                correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
                 res.append(correct_k.mul_(100.0 / batch_size))
             return res
 

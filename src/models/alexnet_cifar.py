@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 from SystolicConv2d import SystolicConv2d
 from QuantConv2d import UnfoldConv2d
+from SimModel import SimModel
 
 
-class AlexNet(nn.Module):
+class AlexNet(SimModel):
     def __init__(self, num_classes=10):
         super(AlexNet, self).__init__()
 
