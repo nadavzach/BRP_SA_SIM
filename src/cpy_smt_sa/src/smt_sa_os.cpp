@@ -22,6 +22,7 @@ class smt_sa_os {
 private:
     uint16_t _dim;
     uint8_t _threads;
+    uint8_t _alu_num;
     uint16_t _max_depth;
     xt::xarray<T> _a;
     xt::xarray<T> _b;
@@ -33,7 +34,7 @@ public:
     grid<T> sa_grid;
     uint64_t cycles;
 
-    smt_sa_os (uint16_t dim, uint8_t threads, uint16_t max_depth=4096);
+    smt_sa_os (uint16_t dim, uint8_t threads, uint8_t alu_num, uint16_t max_depth=4096);
 
     void set_inputs(xt::xarray<T> a, xt::xarray<T> b);
     void get_tile(vector<xt::xarray<T>> &tile_a, vector<xt::xarray<T>> &tile_b, tile_idx t_idx);
@@ -42,7 +43,7 @@ public:
 };
 
 template <typename T>
-smt_sa_os<T>::smt_sa_os (uint16_t dim, uint8_t threads, uint16_t max_depth) : _dim(dim), _threads(threads), _max_depth(max_depth), sa_grid(dim, threads, max_depth), cycles(0) {}
+smt_sa_os<T>::smt_sa_os (uint16_t dim,uint8_t threads, uint8_t alu_num, uint16_t max_depth) : _dim(dim), _threads(threads),_alu_num(alu_num), _max_depth(max_depth), sa_grid(dim, threads,alu_num, max_depth), cycles(0) {}
 
 template <typename T>
 void smt_sa_os<T>::set_inputs(xt::xarray<T> a, xt::xarray<T> b) {
@@ -136,7 +137,6 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec) {
     while (computed < while_end) {
         sa_grid.cycle();
         cycles++;
-
         for (uint16_t i=0; i<_dim; i++) {
             for (uint16_t j=0; j<_dim; j++) {
                 uint8_t halt_count = 0;
@@ -146,7 +146,8 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec) {
                         halt_count++;
 
                     uint32_t acc_t = sa_grid.nodes[i][j].get_acc_t(t);
-
+                    std::cout<<"thread: "<<(unsigned int)t<<" node: "<<i<<", "<<j<<" acc_t: "<<acc_t<<std::endl; // DEBUG
+                    //Ssleep(1); // DEBUG
                     assert(subtile_end[t] - subtile_start[t] >= 0);
 
                     if ((acc_t == uint32_t(subtile_end[t] - subtile_start[t])) && !sa_grid.nodes[i][j].is_halt(t))

@@ -15,20 +15,21 @@ class grid {
 private:
     uint16_t _dim;
     uint8_t _threads;
+    uint8_t _alu_num;
     uint16_t _max_depth;
 public:
     vector<node_mem<T>> mem_a;
     vector<node_mem<T>> mem_b;
     vector<vector<node_pu<T>>> nodes;
 
-    grid (uint16_t dim, uint8_t threads, uint16_t max_depth=4096);
+    grid (uint16_t dim, uint8_t threads,uint8_t alu_num, uint16_t max_depth=4096);
     void push(xt::xarray<T> &a, xt::xarray<T> &b, uint8_t thread, bool pad=false);
     void cycle();
     void get_util_rate();
 };
 
 template <typename T>
-grid<T>::grid (uint16_t dim, uint8_t threads, uint16_t max_depth) : _dim(dim), _threads(threads), _max_depth(max_depth) {
+grid<T>::grid (uint16_t dim, uint8_t threads,uint8_t alu_num, uint16_t max_depth) : _dim(dim), _threads(threads),_alu_num(alu_num), _max_depth(max_depth) {
     mem_a.reserve(dim);
     mem_b.reserve(dim);
     nodes.reserve(dim);
@@ -41,7 +42,7 @@ grid<T>::grid (uint16_t dim, uint8_t threads, uint16_t max_depth) : _dim(dim), _
         nodes[i].reserve(dim);
 
         for (uint8_t j=0; j<dim; j++) {
-            nodes[i].push_back(node_pu<T>("node_" + to_string(i) + "_" + to_string(j), threads, max_depth));
+            nodes[i].push_back(node_pu<T>("node_" + to_string(i) + "_" + to_string(j), threads,_alu_num, max_depth));
         }
     }
 
