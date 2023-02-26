@@ -17,6 +17,16 @@ struct tile_idx {
     uint32_t d3;
 };
 
+struct stats_str {
+	float stats_zero_ops=0;
+	float stats_1thread_mult_ops=0;
+	float stats_multi_thread_mult_ops=0;
+	float stats_alu_not_utilized=0;
+	float stats_buffer_fullness_acc=0;
+	float stats_buffer_max_fullness=0;
+};
+
+
 template <typename T>
 class smt_sa_os {
 private:
@@ -29,17 +39,17 @@ private:
 
     void _subtile_dict(vector<uint16_t> &subtile_start, vector<uint16_t> &subtile_end);
     void _subtile_range(uint8_t thread, uint16_t &thread_tile_start, uint16_t &thread_tile_end);
-
 public:
     grid<T> sa_grid;
     uint64_t cycles;
+    uint64_t nodes_num=0;
 
     smt_sa_os (uint16_t dim, uint8_t threads, uint8_t alu_num, uint16_t max_depth=4096);
 
     void set_inputs(xt::xarray<T> a, xt::xarray<T> b);
     void get_tile(vector<xt::xarray<T>> &tile_a, vector<xt::xarray<T>> &tile_b, tile_idx t_idx);
-    xt::xarray<T> go();
-    xt::xarray<T> go(vector<tile_idx> &tile_vec);
+    xt::xarray<T> go(stats_str& stats);
+    xt::xarray<T> go(vector<tile_idx> &tile_vec,stats_str& stats);
 };
 
 template <typename T>
@@ -112,7 +122,7 @@ void smt_sa_os<T>::_subtile_range(uint8_t thread, uint16_t &thread_tile_start, u
 }
 
 template <typename T>
-xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec) {
+xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
     assert(tile_vec.size() > 0);
     uint16_t a_tiles = ceil(float(_a.shape()[1]) / _dim);
     uint16_t b_tiles = ceil(float(_b.shape()[1]) / _dim);
@@ -140,7 +150,7 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec) {
         for (uint16_t i=0; i<_dim; i++) {
             for (uint16_t j=0; j<_dim; j++) {
                 uint8_t halt_count = 0;
-
+		
                 for (uint8_t t=0; t<_threads; t++) {
                     if (sa_grid.nodes[i][j].is_halt(t))
                         halt_count++;
@@ -153,7 +163,7 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec) {
                     if ((acc_t == uint32_t(subtile_end[t] - subtile_start[t])) && !sa_grid.nodes[i][j].is_halt(t))
                         sa_grid.nodes[i][j].halt(t);
                 }
-
+				
                 if (halt_count == _threads) {
                     uint32_t batch = floor(float(array_ctrl(i, j)) / (a_tiles * b_tiles));
                     uint32_t i_result = int(i + int((array_ctrl(i, j) % (a_tiles * b_tiles)) / b_tiles) * _dim);
@@ -169,7 +179,13 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec) {
 
                     sa_grid.nodes[i][j].release();
                 }
-            }
+			
+
+
+				
+			}	
+
+
         }
 
         if (sa_grid.mem_a[0]._buf[0].size() < 128) {
@@ -186,15 +202,53 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec) {
             }
         }
     }
+  	for (uint16_t i=0; i<_dim; i++) {
+    	for (uint16_t j=0; j<_dim; j++) {
+
+			//stats gather
+			float stats_zero_ops;
+			float stats_1thread_mult_ops;
+			float stats_multi_thread_mult_ops;
+			float stats_alu_not_utilized;
+			float stats_buffer_fullness_acc;
+			float stats_buffer_max_fullness;
+		
+			sa_grid.nodes[i][j].get_stats(stats_alu_not_utilized, stats_zero_ops,stats_1thread_mult_ops,stats_multi_thread_mult_ops,stats_buffer_fullness_acc,stats_buffer_max_fullness);
+		
+							
+		
+			stats.stats_zero_ops              += stats_zero_ops;
+		    stats.stats_1thread_mult_ops      += stats_1thread_mult_ops;
+		    stats.stats_multi_thread_mult_ops += stats_multi_thread_mult_ops;
+		    stats.stats_alu_not_utilized      += stats_alu_not_utilized;
+			if(i!=0 && j!=0){
+		    	stats.stats_buffer_fullness_acc   += stats_buffer_fullness_acc;
+				if( stats.stats_buffer_max_fullness < stats_buffer_max_fullness)
+		    		stats.stats_buffer_max_fullness  = stats_buffer_max_fullness;
+			}
+			nodes_num++;
+		}
+	}
+
+
+	//stats.stats_zero_ops              = stats.stats_zero_ops              / nodes_num;
+    //stats.stats_1thread_mult_ops      = stats.stats_1thread_mult_ops      / nodes_num;
+    //stats.stats_multi_thread_mult_ops = stats.stats_multi_thread_mult_ops / nodes_num;
+    //stats.stats_alu_not_utilized      = stats.stats_alu_not_utilized      / nodes_num;
+    stats.stats_buffer_fullness_acc   = stats.stats_buffer_fullness_acc   / nodes_num;
+
+	//stats gather - end
+
 
     return result;
 }
 
 template <typename T>
-xt::xarray<T> smt_sa_os<T>::go() {
+xt::xarray<T> smt_sa_os<T>::go(stats_str& stats) {
     uint16_t batch = _a.shape()[0];
     uint16_t a_tiles = ceil(float(_a.shape()[1]) / _dim);
     uint16_t b_tiles = ceil(float(_b.shape()[1]) / _dim);
+	
 
     xt::xarray<T> result = xt::zeros<T>({_a.shape()[0], _a.shape()[1], _b.shape()[1]});
     vector<tile_idx> tile_vec;
@@ -211,7 +265,8 @@ xt::xarray<T> smt_sa_os<T>::go() {
         }
     }
 
-    result += go(tile_vec);
+    result += go(tile_vec,stats);
+
 
     return result;
 }

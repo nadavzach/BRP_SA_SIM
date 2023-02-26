@@ -46,7 +46,7 @@ node_mem<T>::node_mem (string name, uint8_t threads) : _name(name), _threads(thr
 template <typename T>
 void node_mem<T>::go() {
     for (uint8_t t=0; t<_threads; t++) {
-        if (_buf[t].size() > 0) {
+        if (_buf[t].size() > 0 && out->is_ready(out_buf_idx,t)) {
             bool is_empty;
             mem_entry<T> me = pop(t, is_empty);
 

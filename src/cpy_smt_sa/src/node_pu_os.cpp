@@ -22,6 +22,13 @@ private:
     vector<uint32_t> _acc_t;
     vector<bool> _halt;
     bool _is_util;
+	float _stats_zero_ops=0;
+	float _stats_1thread_mult_ops=0;
+	float _stats_multi_thread_mult_ops=0;
+	float _stats_alu_not_utilized=0;
+	float _stats_buffer_fullness_acc=0;
+	float _stats_buffer_max_fullness=0;
+	int _threads_go_count=0;
 
 public:
     vector<fifo<T>> _buf_a, _buf_b;
@@ -31,6 +38,11 @@ public:
     
     T pop(bool buf, uint8_t thread, bool &is_empty);
     T get_acc() { return _acc; };
+	void get_stats(float& stats_alu_not_utilized, float& stats_zero_ops,float& stats_1thread_mult_ops,float& stats_multi_thread_mult_ops,float& stats_buffer_fullness_acc,float& stats_buffer_max_fullness);
+
+
+
+
 
     uint32_t get_acc_t(uint8_t thread) { return _acc_t[thread]; }; 
     void push(T x, bool buf, uint8_t thread);
@@ -74,6 +86,19 @@ node_pu<T>::node_pu (string name, uint8_t threads,uint8_t alu_num, uint16_t max_
     }
 }
 
+template <typename T>
+void node_pu<T>::get_stats(float& stats_alu_not_utilized,float& stats_zero_ops,float& stats_1thread_mult_ops,float& stats_multi_thread_mult_ops,float& stats_buffer_fullness_acc,float& stats_buffer_max_fullness){
+
+	stats_zero_ops             	= _stats_zero_ops;
+	stats_1thread_mult_ops     	= _stats_1thread_mult_ops;
+	stats_multi_thread_mult_ops	= _stats_multi_thread_mult_ops;
+	stats_buffer_fullness_acc  	= _stats_buffer_fullness_acc/_threads_go_count;
+	stats_buffer_max_fullness  	= _stats_buffer_max_fullness;
+	stats_alu_not_utilized     	= _stats_alu_not_utilized;
+
+	return;
+
+}
 template <typename T>
 void node_pu<T>::push(T x, bool buf, uint8_t thread) {
     assert(thread < _threads);
@@ -194,6 +219,7 @@ void node_pu<T>::go() {
 				}
 	    	}	else {
 				th_op_arr[t] = -3; //zero operation	
+				_stats_zero_ops++;
 				}
 		}
     }
@@ -202,10 +228,17 @@ void node_pu<T>::go() {
 			assert(th_op_arr[t] == -1);
    			pop(0, t, is_a_empty);
       		pop(1, t, is_b_empty);
-            if (out_a != 0)
-        		   out_a->push(a[t], 0, t);
-       		if (out_b != 0)
+            if (out_a != 0){
+				if(!(out_a->is_ready(0,t)))
+					cout<<"ERROR!\n";
+        		out_a->push(a[t], 0, t);
+			}
+       		if (out_b != 0){
+				if(!(out_b->is_ready(1,t)))
+					cout<<"ERROR!\n";
+
         		   out_b->push(b[t], 1, t);
+			}
             _acc_t[t]++;
         }
     }
@@ -224,9 +257,30 @@ void node_pu<T>::go() {
 		}
 		_acc += squeeze_and_multiply(alu_ocp_arr[i],alu_a_arg_arr,alu_b_arg_arr);
 	}
-	
+
+	// -- statistics gather -- //
+
  	for (uint8_t i=0; i<_alu_num; i++) {
-		//cout<<" alu arr["<<(unsigned int)i<<"]= "<<alu_ocp_arr[i]<<"\n";
+		if(alu_ocp_arr[i] == 1){
+			_stats_1thread_mult_ops++;
+		} else {
+			if(alu_ocp_arr[i] > 1){
+				_stats_multi_thread_mult_ops++;
+			} else {
+				_stats_alu_not_utilized++;
+			}
+		}
+	}
+	for (uint8_t t=0; t<_threads; t++) {
+		_stats_buffer_fullness_acc = _stats_buffer_fullness_acc + (_buf_a[t].size() + _buf_b[t].size())/2;
+		_threads_go_count++;
+		if(_buf_a[t].size() > _stats_buffer_max_fullness)
+			_stats_buffer_max_fullness = _buf_a[t].size();
+
+		if(_buf_b[t].size() > _stats_buffer_max_fullness)
+			_stats_buffer_max_fullness = _buf_b[t].size();
+		//if(_buf_b[t].size() > _max_depth || _buf_a[t].size() > _max_depth )
+			//std::cout<<"error - buff size is bigger than max depth, size - buf a= "<< _buf_a[t].size()<<"buf b= "<<_buf_b[t].size()<<"\n";
 	}
 
  	//for (uint8_t t=0; t<_threads; t++) {
@@ -246,7 +300,7 @@ template <typename T>
 bool node_pu<T>::try_pushback(uint8_t thread) {
 
 	if (_buf_a[thread].size() >= _max_depth-1 || _buf_b[thread].size()  >= _max_depth-1)
-			return false;
+		return false;
 	return true;	
 }
 

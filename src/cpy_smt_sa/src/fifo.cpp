@@ -46,7 +46,7 @@ T fifo<T>::peek(bool& is_empty) {
 template <typename T>
 void fifo<T>::push(T x) {
     assert(_pushed == false);
-
+	
     _phy_fifo.push(x);
     _pushed = true;
     _last_pushed = x;

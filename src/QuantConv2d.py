@@ -232,6 +232,7 @@ class UnfoldConv2d(nn.Module):
                                        stride=self.conv.stride[0],
                                        padding=self.conv.padding[0])
         else:
+            print(" == else (not self.unfold line 234 QuantCon2d")
             # At the moment, unfold and quantization must go together
             assert(self._quantize)
 
@@ -250,8 +251,10 @@ class UnfoldConv2d(nn.Module):
 
             if self.training:
                 self.sort_stats += (x_unf > (2**(self._x_bits/2) - 1)).sum(dim=(0, 1))
+            print(" == hw sim is: " + str(self._hw_sim))
 
             if not self._hw_sim:
+
                 out_unf = x_unf.matmul(w_unf).transpose(1, 2)
                 out = nn.functional.fold(out_unf, (ofmap_height, ofmap_width), (1, 1))
 
@@ -264,6 +267,7 @@ class UnfoldConv2d(nn.Module):
 
             # HW simulation
             else:
+                print(" == hw sim start == ")
                 threads = self._threads
                 assert (threads == 4 or threads == 2 or threads == 1)
                 trunc_func = RoundSTE if self._round is True else FloorSTE
@@ -404,8 +408,11 @@ class UnfoldConv2d(nn.Module):
 
                 self.stats['mse_error'] += torch.nn.functional.mse_loss(out, out_ref).item()
 
+                print(" == hw sim end == ")
+
         if not self.training:
             self.stats['mac_count'] += out.size(0) * out.size(1) * out.size(2) * out.size(3) * \
                                        self.conv.weight.size(1) * self.conv.weight.size(2) * self.conv.weight.size(3)
 
+        print("quantConv2d end")
         return out
