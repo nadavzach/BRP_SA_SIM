@@ -68,6 +68,7 @@ grid<T>::grid (uint16_t dim, uint8_t threads,uint8_t alu_num, uint16_t max_depth
 
 template <typename T>
 void grid<T>::push(xt::xarray<T> &a, xt::xarray<T> &b, uint8_t thread, bool pad) {
+    
     uint32_t a_H = a.shape()[0];
     uint32_t a_W = a.shape()[1];
     uint32_t b_H = b.shape()[0];

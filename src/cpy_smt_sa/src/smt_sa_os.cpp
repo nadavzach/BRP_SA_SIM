@@ -24,6 +24,8 @@ struct stats_str {
 	float stats_alu_not_utilized=0;
 	float stats_buffer_fullness_acc=0;
 	float stats_buffer_max_fullness=0;
+    float stats_total_cycles=0;
+
 };
 
 
@@ -236,6 +238,7 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
     //stats.stats_multi_thread_mult_ops = stats.stats_multi_thread_mult_ops / nodes_num;
     //stats.stats_alu_not_utilized      = stats.stats_alu_not_utilized      / nodes_num;
     stats.stats_buffer_fullness_acc   = stats.stats_buffer_fullness_acc   / nodes_num;
+    stats.stats_total_cycles = cycles;
 
 	//stats gather - end
 
