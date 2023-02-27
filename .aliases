@@ -1,0 +1,8 @@
+MODEL_ROOT="/home/bgabbay/advanced_computer_arch/BRP_SA_SIM"
+export MODEL_ROOT
+alias ali='vim $MODEL_ROOT/.aliases'
+alias sali='source $MODEL_ROOT/.aliases'
+alias run_test='python3 -m pytest -s $MODEL_ROOT/src/cpy_smt_sa/tests'
+alias build_smt_sa='rm $MODEL_ROOT/src/cpy_smt_sa/build/lib.linux-x86_64-3.10/cpy_smt_sa.cpython-310-x86_64-linux-gnu.so ; pip3 install $MODEL_ROOT/src/cpy_smt_sa'
+alias build_baseline='rm $MODEL_ROOT/Baseline-SMT-SA/baseline_smt_sa/build/lib.linux-x86_64-3.10/baseline_smt_sa.cpython-310-x86_64-linux-gnu.so ; pip3 install $MODEL_ROOT/Baseline-SMT-SA/baseline_smt_sa'
+alias which='type'

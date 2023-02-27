@@ -46,6 +46,8 @@ public:
     bool is_ready_out(uint8_t thread);
     bool is_halt(uint8_t thread) { return _halt[thread]; };
     bool is_util() { return _is_util; };
+	T saturation_op(T a, T b, bool mult);
+	T pow2(int x);
 };
 
 template <typename T>
@@ -137,7 +139,8 @@ void node_pu<T>::go() {
                 out_b->push(b, 1, t);
 
             if (a != 0 and b != 0) {
-                _acc += a * b;
+				_acc = saturation_op(_acc, saturation_op(a, b, true), false);
+                //_acc += a * b;
                 _is_util = true;
                 break;
             }
@@ -164,5 +167,29 @@ void node_pu<T>::cycle() {
         _buf_b[t].cycle();
     }
 }
+template <typename T>
+T node_pu<T>::pow2(int x){
+    T retval = 1;
+    for(int i = 0 ; i<x ; i++)
+        retval *= 2;
+    return retval;
+}
+template <typename T>
+T node_pu<T>::saturation_op(T a, T b, bool mult)
+{
+    int bits = sizeof(T)*8;
+    int64_t max_sat = pow2(bits)-1;
+    int64_t min_sat = 0;
+    int64_t temp_res;
+    if(mult){
+        temp_res = a*b;
+    }
+    else
+        temp_res = a+b;
+    if(temp_res < a)
+        return (T)max_sat;
+    return (T)temp_res;
+}
+
 
 #endif
