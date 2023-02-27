@@ -33,10 +33,10 @@ class ExampleTest(TestCase):
         
         np.random.seed(0)
         dim = 3
-        threads = 4
-        alu_num = 2
-        max_depth = 10
-        push_back = False
+        threads = 2
+        alu_num = 1
+        max_depth = 2
+        push_back = True
         low_prec_mult = True
         
         a_w = 5
