@@ -68,31 +68,33 @@ class TestSa(TestCase):
             print(" b is of size ("+str(b_w)+" x "+str(b_h)+")\n")
             print(" the systolic array is of size (" +str(dim) +" x " + str(dim)+")\n ")
             print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
-            for test_config in test_configs_list:
 
+
+            a = np.random.randint(0,20,size = (a_w,a_h,a_c))
+            b = np.random.randint(0,20,size = (b_w,b_h))
+
+            a_num_zeros = int(zero_per * a_w * a_h * a_c)
+            a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
+            a.ravel()[a_zero_indices] = 0
+            b_num_zeros = int(zero_per * b_w * b_h )
+            b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
+            b.ravel()[b_zero_indices] = 0
+
+
+            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False)
+            for test_config in test_configs_list:
                 max_depth = test_config[0]
                 threads = test_config[1]
                 alu_num = test_config[2]
                 enable_pushback = test_config[3]
                 enable_low_prec_mult = test_config[4]
-                if(not enable_low_prec_mult and not enable_pushback):#not supported ?
-                   continue 
-
-                a = np.random.randint(0,255,size = (a_w,a_h,a_c))
-                b = np.random.randint(0,255,size = (b_w,b_h))
-
-                a_num_zeros = int(zero_per * a_w * a_h * a_c)
-                a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
-                a.ravel()[a_zero_indices] = 0
-                b_num_zeros = int(zero_per * b_w * b_h )
-                b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
-                b.ravel()[b_zero_indices] = 0
-
-                print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+" \n")
+                #if(not enable_low_prec_mult and not enable_pushback):#not supported ?
+                #   continue 
                 result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult)
+
+                mse_from_base_line = np.mean((result_tuple[0]-base_line_test_output[0])**2)
                 test_output_tuples_list.append(tuple((test_config,result_tuple)))
 
-            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False)
             mse_cycles_data = []
             for test_output in test_output_tuples_list:
                 
@@ -110,24 +112,54 @@ class TestSa(TestCase):
                 stats_total_cycles          = result_tuple[7]
                 stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
                 mse_from_base_line = np.mean((result-base_line_test_output[0])**2)
+                print(mse_from_base_line)
+                print(test_config)
 
                 mse_cycles_data.append(tuple((stats_total_cycles,mse_from_base_line,("("+str(test_config[0])+","+str(test_config[1])+","+str(test_config[2])+","+str(test_config[3])+","+str(test_config[4])+")"))))
             plot_data(mse_cycles_data,"Cycles","mse")
+        else:
 
+            a = np.random.randint(0,20,size = (a_w,a_h,a_c))
+            b = np.random.randint(0,20,size = (b_w,b_h))
 
+            a_num_zeros = int(zero_per * a_w * a_h * a_c)
+            a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
+            a.ravel()[a_zero_indices] = 0
+            b_num_zeros = int(zero_per * b_w * b_h )
+            b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
+            b.ravel()[b_zero_indices] = 0
 
+            print("running base line test... \n\n")
+            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False)
+            print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+" \n")
+            result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult)
 
+            #calc statistics:
+            result                      = result_tuple[0]
+            stats_zero_ops              = result_tuple[1]
+            stats_1thread_mult_ops      = result_tuple[2]
+            stats_multi_thread_mult_ops = result_tuple[3]
+            stats_buffer_fullness_acc   = result_tuple[4]
+            stats_buffer_max_fullness   = result_tuple[5]
+            stats_alu_not_utilized      = result_tuple[6]
+            stats_total_cycles          = result_tuple[7]
+            stats_speed_up = base_line_test_output[7] / stats_total_cycles
+            stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
+            mse_from_base_line = np.mean((result-base_line_test_output[0])**2)
+            stats_alu_total = stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops + stats_alu_not_utilized
 
-
-        #print("finished test, result - \n")
-        #print(result.astype(np.uint))
-        #print("stats_zero_ops %             :  " +str(100*stats_zero_ops/stats_ops_total             ))
-        #print("stats_1thread_mult_ops %     :  " +str(100*stats_1thread_mult_ops/stats_ops_total     ))
-        #print("stats_multi_thread_mult_ops % :  " +str(100*threads*stats_multi_thread_mult_ops/stats_ops_total ))
-        #print("stats_total_thread_mult_ops % :  " +str(stats_ops_total ))
-        #print("stats_alu_not_utilized     :  " +str(stats_alu_not_utilized     ))
-        #print("stats_buffer_fullness_acc  :  " +str(stats_buffer_fullness_acc  ))
-        #print("stats_buffer_max_fullness  :  " +str(stats_buffer_max_fullness  ))
+            print("finished test, result - \n")
+            print(result.astype(np.uint))
+            print("total cycles                     :  " +str(stats_total_cycles))
+            print("speed up from base line          :  " +str(stats_speed_up))
+            print("stats_zero_ops %                 :  " +str(100*stats_zero_ops/stats_ops_total             ))
+            print("stats_1thread_mult_ops %         :  " +str(100*stats_1thread_mult_ops/stats_ops_total     ))
+            print("stats_multi_thread_mult_ops %    :  " +str(100*threads*stats_multi_thread_mult_ops/stats_ops_total ))
+            print("stats_total_thread_mult_ops %    :  " +str(stats_ops_total ))
+            print("stats_buffer_fullness_acc        :  " +str(stats_buffer_fullness_acc  ))
+            print("stats_buffer_max_fullness        :  " +str(stats_buffer_max_fullness  ))
+            print("MSE from base line               :  " +str(mse_from_base_line  ))
+            print("stats_alu_not_utilized %         :  " +str(100*stats_alu_not_utilized/stats_alu_total ))
 
 
 
@@ -152,8 +184,8 @@ def plot_data(data,x_label,y_label):
         ax.annotate(label, (x_vals[i], y_vals[i])).set_fontsize(20)
 
     # Set axis labels
-    ax.set_xlabel('x_label')
-    ax.set_ylabel('y_label')
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
 
     # add general text to the graph
     textstr = 'labels - (buffer depth,threads,alu num,enable pushback,enable low prec mult)'
@@ -163,7 +195,7 @@ def plot_data(data,x_label,y_label):
     
     # Show the plot
     #plt.show()
-    path = './results/'+str(x_label)+'_'+str(y_label)+'_graph.jpeg'
+    path =  './src/cpy_smt_sa/tests/results/'+str(x_label)+'_'+str(y_label)+'_graph.jpeg'
     if(os.path.exists(path)):
         os.remove(path)
     plt.savefig(path)
@@ -171,7 +203,7 @@ def plot_data(data,x_label,y_label):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run unittest with an expected value')
-    parser.add_argument('--threads',default=2, type=int, help='number of threads')
+    parser.add_argument('--threads',default=1, type=int, help='number of threads')
     parser.add_argument('--dim',default=3, type=int, help='number of dim')
     parser.add_argument('--alu_num',default=1, type=int, help='number of alu units')
     parser.add_argument('--buffer_size',default=10, type=int, help='buffer size')

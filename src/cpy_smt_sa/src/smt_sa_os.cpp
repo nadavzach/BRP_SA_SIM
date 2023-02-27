@@ -234,6 +234,7 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
 
 
 	//stats.stats_zero_ops              = stats.stats_zero_ops              / nodes_num;
+    
     //stats.stats_1thread_mult_ops      = stats.stats_1thread_mult_ops      / nodes_num;
     //stats.stats_multi_thread_mult_ops = stats.stats_multi_thread_mult_ops / nodes_num;
     //stats.stats_alu_not_utilized      = stats.stats_alu_not_utilized      / nodes_num;
