@@ -11,6 +11,8 @@
 
 using namespace std;
 extern bool _node_push_back_en;
+extern bool _low_prec_mult_en = false;
+
 template <typename T>
 class node_pu {
 private:

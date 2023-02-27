@@ -16,6 +16,7 @@ class TestSa(TestCase):
         stats_alu_not_utilized = 0
         stats_buffer_fullness_acc = 0
         stats_buffer_max_fullness = 0
+
         
         np.random.seed(0)
         dim = self.dim
@@ -55,6 +56,12 @@ class TestSa(TestCase):
             # Iterate over the indices and create a tuple with the corresponding values from each input array
             for index in indices:
                 test_configs_list.append(tuple(arr[index[i]] for i, arr in enumerate(arr_list)))
+            test_output_tuples_list =[]
+            print("SA configuration:\n")
+            print(" a is of size ("+str(a_w)+" x "+str(a_h)+" x "+str(a_c)+")\n")
+            print(" b is of size ("+str(b_w)+" x "+str(b_h)+")\n")
+            print(" the systolic array is of size (" +str(dim) +" x " + str(dim)+")\n ")
+            print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
             for test_config in test_configs_list:
 
                 max_depth = test_config[0]
@@ -62,7 +69,7 @@ class TestSa(TestCase):
                 alu_num = test_config[2]
                 enable_pushback = test_config[3]
                 enable_low_prec_mult = test_config[4]
-                
+
                 a = np.random.randint(0,255,size = (a_w,a_h,a_c))
                 b = np.random.randint(0,255,size = (b_w,b_h))
 
@@ -73,29 +80,32 @@ class TestSa(TestCase):
                 b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
                 b.ravel()[b_zero_indices] = 0
 
+                print("running test for configuration: buffer size=" + str(max_depth) + "threads num= "+ str(threads) + "alu num= " + str(alu_num) + "push back= " + str(enable_pushback) + "low precision mult= " +str(enable_low_prec_mult)+"\n")
+                result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult)
+                test_output_tuples_list.append(tuple(test_config,result_tuple))
 
-                result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,stats_alu_not_utilized, stats_zero_ops,stats_1thread_mult_ops,stats_multi_thread_mult_ops,stats_buffer_fullness_acc,stats_buffer_max_fullness)
-                result = result_tuple[0]
-                stats_zero_ops              = result_tuple[1]
-                stats_1thread_mult_ops      = result_tuple[2]
-                stats_multi_thread_mult_ops = result_tuple[3]
-                stats_buffer_fullness_acc   = result_tuple[4]
-                stats_buffer_max_fullness   = result_tuple[5]
-                stats_alu_not_utilized      = result_tuple[6]
+                #result = result_tuple[0]
+                #stats_zero_ops              = result_tuple[1]
+                #stats_1thread_mult_ops      = result_tuple[2]
+                #stats_multi_thread_mult_ops = result_tuple[3]
+                #stats_buffer_fullness_acc   = result_tuple[4]
+                #stats_buffer_max_fullness   = result_tuple[5]
+                #stats_alu_not_utilized      = result_tuple[6]
+                #stats_total_cycles          = result_tuple[7]
 
-                stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
+                #stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
 
 
 
-        print("finished test, result - \n")
-        print(result.astype(np.uint))
-        print("stats_zero_ops %             :  " +str(100*stats_zero_ops/stats_ops_total             ))
-        print("stats_1thread_mult_ops %     :  " +str(100*stats_1thread_mult_ops/stats_ops_total     ))
-        print("stats_multi_thread_mult_ops % :  " +str(100*threads*stats_multi_thread_mult_ops/stats_ops_total ))
-        print("stats_total_thread_mult_ops % :  " +str(stats_ops_total ))
-        print("stats_alu_not_utilized     :  " +str(stats_alu_not_utilized     ))
-        print("stats_buffer_fullness_acc  :  " +str(stats_buffer_fullness_acc  ))
-        print("stats_buffer_max_fullness  :  " +str(stats_buffer_max_fullness  ))
+        #print("finished test, result - \n")
+        #print(result.astype(np.uint))
+        #print("stats_zero_ops %             :  " +str(100*stats_zero_ops/stats_ops_total             ))
+        #print("stats_1thread_mult_ops %     :  " +str(100*stats_1thread_mult_ops/stats_ops_total     ))
+        #print("stats_multi_thread_mult_ops % :  " +str(100*threads*stats_multi_thread_mult_ops/stats_ops_total ))
+        #print("stats_total_thread_mult_ops % :  " +str(stats_ops_total ))
+        #print("stats_alu_not_utilized     :  " +str(stats_alu_not_utilized     ))
+        #print("stats_buffer_fullness_acc  :  " +str(stats_buffer_fullness_acc  ))
+        #print("stats_buffer_max_fullness  :  " +str(stats_buffer_max_fullness  ))
 
 
 
