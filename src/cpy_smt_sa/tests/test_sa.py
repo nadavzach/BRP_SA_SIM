@@ -5,6 +5,7 @@ import numpy as np
 import random
 import argparse
 import matplotlib.pyplot as plt
+import os
 
 
 
@@ -42,7 +43,7 @@ class TestSa(TestCase):
         
 
         if(run_pre_saved_configs):
-            max_depth_opts = [1,5,10,20,50,100]
+            max_depth_opts = [1,5,10,20]
             threads_opts = [1,2,4]
             alu_num_opts = [1,2]
             pushback_opts = [True,False]
@@ -143,12 +144,12 @@ def plot_data(data,x_label,y_label):
 
     # Create the plot
     fig, ax = plt.subplots()
-    fig.set_size_inches(20,20)
+    fig.set_size_inches(30,30)
     ax.scatter(x_vals, y_vals)
     
     # Add labels to each point
     for i, label in enumerate(labels):
-        ax.annotate(label, (x_vals[i], y_vals[i]))
+        ax.annotate(label, (x_vals[i], y_vals[i])).set_fontsize(20)
 
     # Set axis labels
     ax.set_xlabel('x_label')
@@ -162,7 +163,10 @@ def plot_data(data,x_label,y_label):
     
     # Show the plot
     #plt.show()
-    plt.savefig('./results/'+str(x_label)+'_'+str(y_label)+'_graph.jpeg')
+    path = './results/'+str(x_label)+'_'+str(y_label)+'_graph.jpeg'
+    if(os.path.exists(path)):
+        os.remove(path)
+    plt.savefig(path)
 
 
 if __name__ == '__main__':
