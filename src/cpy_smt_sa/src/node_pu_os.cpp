@@ -11,6 +11,7 @@
 
 using namespace std;
 extern bool _node_push_back_en;
+extern bool _node_low_prec_mult_en;
 template <typename T>
 class node_pu {
 private:
@@ -206,14 +207,18 @@ void node_pu<T>::go() {
                             //unable to pushback - 
                             //search for alu to do reduced mult
                             for(uint8_t i=0;i<_alu_num;i++){				
-                                if(	alu_ocp_arr[i] < ALU_MAX_OCP){
+                                if(	alu_ocp_arr[i] < (_node_low_prec_mult_en ? ALU_MAX_OCP : 1)){
                                     th_op_arr[t] = i;
                                     alu_ocp_arr[i]++;
                                     break;
                                 }
-
                             }
-                            assert();
+                            if(th_op_arr[t]<0){
+                                //unable to pushback (without stalling the previous node)
+                                //all ALUs are occupied
+                                //doing pushback anyway
+                                th_op_arr[t] = -2;
+                            }
                         }
                         else {// did pushback
                             th_op_arr[t] = -2;

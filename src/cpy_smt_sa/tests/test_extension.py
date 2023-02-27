@@ -33,17 +33,18 @@ class ExampleTest(TestCase):
         
         np.random.seed(0)
         dim = 3
-        threads = 2
-        alu_num = 1
+        threads = 4
+        alu_num = 2
         max_depth = 10
-        push_back = True
+        push_back = False
+        low_prec_mult = True
         
         a_w = 5
-        a_h = 5 
+        a_h = 5
         a_d = 5 
         
-        b_w = a_d 
-        b_h = 5 
+        b_w = a_d
+        b_h = 5
         a = np.random.randint(0,255,size = (a_w,a_h,a_d))
         b = np.random.randint(0,255,size = (b_w,b_h))
         
@@ -56,7 +57,7 @@ class ExampleTest(TestCase):
         print("b array: \n")
         print(b)
         print("running first test with run_int8:")"""
-        result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,push_back)
+        result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,push_back,low_prec_mult)
         result = result_tuple[0]
         stats_zero_ops              = result_tuple[1]
         stats_1thread_mult_ops      = result_tuple[2]
@@ -66,24 +67,25 @@ class ExampleTest(TestCase):
         stats_alu_not_utilized      = result_tuple[6]
         stats_total_cycles          = result_tuple[7]
 
-        stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
-
+        stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops
+        stats_alu_total = stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops + stats_alu_not_utilized
         baseline_res = baseline.run_uint8(dim,threads,max_depth,a,b)
 
         print("finished test, result - \n")
         print(result.astype(np.uint))
         print("baseline result - \n")
         print(baseline_res.astype(np.uint))
-        highlight_differences(result,baseline_res)
-        #print((result-baseline_res).astype(np.uint))
-        print("stats_zero_ops %              :  " +str(100*stats_zero_ops/stats_ops_total             ))
-        print("stats_1thread_mult_ops %      :  " +str(100*stats_1thread_mult_ops/stats_ops_total     ))
+        #print(highlight_differences(result,baseline_res))
+        print((abs(result-baseline_res)).astype(np.uint))
+        print("stats_total_cycles            :  " +str(stats_total_cycles  ))
+        print("stats_total_thread_mult_ops   :  " +str(stats_ops_total ))
+        print("stats_zero_ops %              :  " +str(100*stats_zero_ops/stats_ops_total))
+        print("stats_1thread_mult_ops %      :  " +str(100*stats_1thread_mult_ops/stats_ops_total))
         print("stats_multi_thread_mult_ops % :  " +str(100*threads*stats_multi_thread_mult_ops/stats_ops_total ))
-        print("stats_total_thread_mult_ops % :  " +str(stats_ops_total ))
-        print("stats_alu_not_utilized        :  " +str(stats_alu_not_utilized     ))
+        print("stats_alu_not_utilized %      :  " +str(100*stats_alu_not_utilized/stats_alu_total ))
         print("stats_buffer_fullness_acc     :  " +str(stats_buffer_fullness_acc  ))
         print("stats_buffer_max_fullness     :  " +str(stats_buffer_max_fullness  ))
-        print("stats_total_cycles            : " +str(stats_total_cycles  ))
+        
 
 
         
