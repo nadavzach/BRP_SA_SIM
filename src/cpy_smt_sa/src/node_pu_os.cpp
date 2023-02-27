@@ -23,6 +23,7 @@ private:
     vector<uint32_t> _acc_t;
     vector<bool> _halt;
     bool _is_util;
+    vector<uint8_t> _LRU;
 	float _stats_zero_ops=0;
 	float _stats_1thread_mult_ops=0;
 	float _stats_multi_thread_mult_ops=0;
@@ -66,7 +67,7 @@ public:
 
     // NB_SMT Project Aux Functions
     void squeeze_and_multiply(uint8_t active_threads,T alu_a_arg_arr[ALU_MAX_OCP],T alu_b_arg_arr[ALU_MAX_OCP], T& _acc);
-
+    void check_and_reset_LRU();
 	T pow2(int x);
 	void peek(T& x,bool& is_empty, bool buf, uint8_t thread);
 	bool try_pushback(uint8_t thread);
@@ -78,12 +79,14 @@ node_pu<T>::node_pu (string name, uint8_t threads,uint8_t alu_num, uint16_t max_
     _buf_b.reserve(threads);
     _acc_t.reserve(threads);
     _halt.reserve(threads);
+    _LRU.reserve(threads);
 
     for (uint8_t i=0; i<threads; i++) {
         _buf_a.push_back(fifo<T>("fifo_a_" + name));
         _buf_b.push_back(fifo<T>("fifo_b_" + name));
         _acc_t.push_back(0);
         _halt.push_back(false);
+        _LRU.push_back(0);
     }
 }
 
@@ -180,12 +183,16 @@ void node_pu<T>::go() {
     for (uint8_t i=0; i<_alu_num; i++) {
 		alu_ocp_arr[i] = -1;
 	}
+    //std::cout<<"LRU: ["<<(int)_LRU[0]<<","<<(int)_LRU[1]<<","<<(int)_LRU[2]<<","<<(int)_LRU[3]<<"]"<<std::endl;
+    //sleep(1);
+    check_and_reset_LRU();
     for (uint8_t t=0; t<_threads; t++) {
+        
 		th_op_arr[t] = -1;
-		th_valid_arr[t] =is_valid(t) && !is_halt(t) && is_ready_out(t); 
+		th_valid_arr[t] =is_valid(t) && !is_halt(t) && is_ready_out(t) ; 
 
-        if (th_valid_arr[t]) {
-
+        if (th_valid_arr[t] && (_LRU[t] == 0)) {
+            //std::cout<<"Thread "<<(int)t<<"executing"<<std::endl;
             peek(a[t],is_a_empty,0,t);
             peek(b[t],is_b_empty,1,t);
        		//assert(!is_a_empty && !is_b_empty);
@@ -195,6 +202,8 @@ void node_pu<T>::go() {
                     for(uint8_t i=0;i<_alu_num;i++){				
                         if(	alu_ocp_arr[i] == -1){
                             th_op_arr[t] = i;
+                            //std::cout<<"thread: "<<(int)t<<" took the ALU"<<std::endl;
+                            _LRU[t] = 1;
                             alu_ocp_arr[i] = 1;
                             break;
                         }
@@ -209,6 +218,7 @@ void node_pu<T>::go() {
                             for(uint8_t i=0;i<_alu_num;i++){				
                                 if(	alu_ocp_arr[i] < (_node_low_prec_mult_en ? ALU_MAX_OCP : 1)){
                                     th_op_arr[t] = i;
+                                    _LRU[t] = 1;
                                     alu_ocp_arr[i]++;
                                     break;
                                 }
@@ -247,7 +257,6 @@ void node_pu<T>::go() {
        		if (out_b != 0){
 				if(!(out_b->is_ready(1,t)))
 					cout<<"ERROR!\n";
-
         		   out_b->push(b[t], 1, t);
 			}
             _acc_t[t]++;
@@ -367,20 +376,6 @@ T node_pu<T>::pow2(int x){
         retval *= 2;
     return retval;
 }
-//T low_prec_mult(T a[_threads],T b[_threads]) {
-//	for(uint8_t t=0; t<_threads; t++){
-//	}
-//
-//	
-//}
-
-//T round_64bit(T x){
-//	if(a[t] > 2**32-1)
-//		return x>>32;
-//	else
-//		return x<<32;
-//	
-//}
 
 template <typename T>
 void node_pu<T>::reset_acc_t() {
@@ -390,8 +385,10 @@ void node_pu<T>::reset_acc_t() {
 
 template <typename T>
 void node_pu<T>::release() {
-    for (uint8_t t=0; t<_threads; t++)
+    for (uint8_t t=0; t<_threads; t++){
         _halt[t] = false;
+        _LRU[t] = 0;
+    }
 }
 
 template <typename T>
@@ -416,5 +413,18 @@ T node_pu<T>::saturation_op(T a, T b, bool mult)
     if(temp_res < a)
         return (T)max_sat;
     return (T)temp_res;
+}
+template <typename T>
+void node_pu<T>::check_and_reset_LRU(){
+    bool th_valid;
+    for (uint8_t t=0; t<_threads; t++) {
+        th_valid =is_valid(t) && !is_halt(t) && is_ready_out(t);
+        if((_LRU[t] == 0) && th_valid) { // we have a thread to execute
+            return;
+        }
+    }
+    // we don't have a thread to execute - resetting LRU
+    //std::cout<<" $$$$$$$$$$ Resetting LRU"<<std::endl;
+    for (uint8_t t=0; t<_threads; t++) _LRU[t] = 0;
 }
 #endif
