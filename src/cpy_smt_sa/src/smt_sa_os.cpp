@@ -62,6 +62,18 @@ void smt_sa_os<T>::set_inputs(xt::xarray<T> a, xt::xarray<T> b) {
     assert(a.shape().size() == 3);
     assert(b.shape().size() == 2);
     assert(a.shape()[2] == b.shape()[0]);
+    if(a.shape().size() != 3)
+        cout<<"a size error!! size is: "<<a.shape().size()<<endl;
+    if(b.shape().size() != 2)
+        cout<<"b size error!! size is: "<<b.shape().size()<<endl;
+    if(a.shape()[2] != b.shape()[0]){
+        cout<<"a b size mismatch error!!"<<endl;
+        cout<<"a.shape()[2] is: "<<a.shape()[2]<<endl;
+        cout<<"b.shape()[0] is: "<<b.shape()[0]<<endl;
+    }
+    cout<<"a_w = "<<a.shape()[0]<<", a_h = "<<a.shape()[1]<<", a_c = "<<a.shape()[2]<<endl;
+    cout<<"b_w = "<<b.shape()[0]<<", b_h = "<<b.shape()[1]<<endl;
+
 
     _a = a;
     _b = b; 

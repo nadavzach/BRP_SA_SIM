@@ -45,8 +45,8 @@ class ExampleTest(TestCase):
         
         b_w = a_d
         b_h = 5
-        a = np.random.randint(0,255,size = (a_w,a_h,a_d))
-        b = np.random.randint(0,255,size = (b_w,b_h))
+        a = np.random.randint(0,20,size = (a_w,a_h,a_d))
+        b = np.random.randint(0,20,size = (b_w,b_h))
         
         a_mask = np.random.randint(0,2,size = (a_w,a_h,a_d))
         b_mask = np.random.randint(0,2,size = (b_w,b_h))
