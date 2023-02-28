@@ -8,8 +8,12 @@
 #include "xtensor/xpad.hpp"
 #include "xtensor/xrandom.hpp"
 #include "grid_os.cpp"
+#include <omp.h>
+
 
 using namespace std;
+
+extern bool _run_parallel;
 
 struct tile_idx {
     uint32_t d1;
@@ -169,45 +173,85 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
         sa_grid_cycle_time += duration_cast<microseconds>(end-start).count();
         cycles++;
         auto start_for_loop = high_resolution_clock::now();
-        for (uint16_t i=0; i<_dim; i++) {
-            for (uint16_t j=0; j<_dim; j++) {
-                uint8_t halt_count = 0;
-		
-                for (uint8_t t=0; t<_threads; t++) {
-                    if (sa_grid.nodes[i][j].is_halt(t))
-                        halt_count++;
+        if(_run_parallel){
+            //cout<<"Running Parallel"<<endl;
+            //#pragma omp parallel for
+            for (uint16_t i=0; i<_dim; i++) {
+                //#pragma omp parallel for
+                for (uint16_t j=0; j<_dim; j++) {
+                    uint8_t halt_count = 0;
+            
+                    for (uint8_t t=0; t<_threads; t++) {
+                        if (sa_grid.nodes[i][j].is_halt(t)){
+                            //#pragma omp atomic
+                            halt_count++;
+                        }
 
-                    uint32_t acc_t = sa_grid.nodes[i][j].get_acc_t(t);
-//                    std::cout<<"thread: "<<(unsigned int)t<<" node: "<<i<<", "<<j<<" acc_t: "<<acc_t<<std::endl; // DEBUG
-                    //Ssleep(1); // DEBUG
-                    assert(subtile_end[t] - subtile_start[t] >= 0);
+                        uint32_t acc_t = sa_grid.nodes[i][j].get_acc_t(t);
+    //                    std::cout<<"thread: "<<(unsigned int)t<<" node: "<<i<<", "<<j<<" acc_t: "<<acc_t<<std::endl; // DEBUG
+                        //Ssleep(1); // DEBUG
+                        assert(subtile_end[t] - subtile_start[t] >= 0);
 
-                    if ((acc_t == uint32_t(subtile_end[t] - subtile_start[t])) && !sa_grid.nodes[i][j].is_halt(t))
-                        sa_grid.nodes[i][j].halt(t);
-                }
-				
-                if (halt_count == _threads) {
-                    uint32_t batch = floor(float(array_ctrl(i, j)) / (a_tiles * b_tiles));
-                    uint32_t i_result = int(i + int((array_ctrl(i, j) % (a_tiles * b_tiles)) / b_tiles) * _dim);
-                    uint32_t j_result = int(j + ((array_ctrl(i, j) % (a_tiles * b_tiles)) % b_tiles) * _dim);
-
-                    if (i_result < result.shape()[1] && j_result < result.shape()[2])
-                        result(batch, i_result, j_result) = sa_grid.nodes[i][j].get_acc();
+                        if ((acc_t == uint32_t(subtile_end[t] - subtile_start[t])) && !sa_grid.nodes[i][j].is_halt(t))
+                            sa_grid.nodes[i][j].halt(t);
+                    }
                     
-                    array_ctrl(i, j)++;
-                    sa_grid.nodes[i][j].reset_acc();
-                    sa_grid.nodes[i][j].reset_acc_t();
-                    computed++;
+                    if (halt_count == _threads) {
+                        uint32_t batch = floor(float(array_ctrl(i, j)) / (a_tiles * b_tiles));
+                        uint32_t i_result = int(i + int((array_ctrl(i, j) % (a_tiles * b_tiles)) / b_tiles) * _dim);
+                        uint32_t j_result = int(j + ((array_ctrl(i, j) % (a_tiles * b_tiles)) % b_tiles) * _dim);
 
-                    sa_grid.nodes[i][j].release();
-                }
-			
+                        if (i_result < result.shape()[1] && j_result < result.shape()[2])
+                            result(batch, i_result, j_result) = sa_grid.nodes[i][j].get_acc();
+                        
+                        array_ctrl(i, j)++;
+                        sa_grid.nodes[i][j].reset_acc();
+                        sa_grid.nodes[i][j].reset_acc_t();
+                        //#pragma omp atomic
+                        computed++;
 
+                        sa_grid.nodes[i][j].release();
+                    }
+                    
+                }	
+            }
+        }
+        else{
+            for (uint16_t i=0; i<_dim; i++) {
+                for (uint16_t j=0; j<_dim; j++) {
+                    uint8_t halt_count = 0;
+            
+                    for (uint8_t t=0; t<_threads; t++) {
+                        if (sa_grid.nodes[i][j].is_halt(t))
+                            halt_count++;
 
-				
-			}	
+                        uint32_t acc_t = sa_grid.nodes[i][j].get_acc_t(t);
+    //                    std::cout<<"thread: "<<(unsigned int)t<<" node: "<<i<<", "<<j<<" acc_t: "<<acc_t<<std::endl; // DEBUG
+                        //Ssleep(1); // DEBUG
+                        assert(subtile_end[t] - subtile_start[t] >= 0);
 
+                        if ((acc_t == uint32_t(subtile_end[t] - subtile_start[t])) && !sa_grid.nodes[i][j].is_halt(t))
+                            sa_grid.nodes[i][j].halt(t);
+                    }
+                    
+                    if (halt_count == _threads) {
+                        uint32_t batch = floor(float(array_ctrl(i, j)) / (a_tiles * b_tiles));
+                        uint32_t i_result = int(i + int((array_ctrl(i, j) % (a_tiles * b_tiles)) / b_tiles) * _dim);
+                        uint32_t j_result = int(j + ((array_ctrl(i, j) % (a_tiles * b_tiles)) % b_tiles) * _dim);
 
+                        if (i_result < result.shape()[1] && j_result < result.shape()[2])
+                            result(batch, i_result, j_result) = sa_grid.nodes[i][j].get_acc();
+                        
+                        array_ctrl(i, j)++;
+                        sa_grid.nodes[i][j].reset_acc();
+                        sa_grid.nodes[i][j].reset_acc_t();
+                        computed++;
+
+                        sa_grid.nodes[i][j].release();
+                    }
+                    
+                }	
+            }
         }
 
         auto end_for_loop = high_resolution_clock::now();
@@ -228,16 +272,16 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
         }
 
         if(cycles%500 == 0 && cycles > 1){
-            cout<<"progress - "<<computed<<"/"<<while_end<<" -> "<<(100*computed/while_end)<<"% done ...\n";
+            cout<<"progress - "<<computed<<"/"<<while_end<<" -> "<<(100*computed/while_end)<<" % done ...\n";
             cout<<"cycles done = "<<cycles<<". \n\n";
-            cout<<"grid_go_cycle avg time [us] = "<<(sa_grid_cycle_time/cycles)/1000<<", for loop avg time is: [us] "<<sa_for_loop_cycle_time/cycles/1000<<". \n";
-            cout<<"total grid cycles [s]= "<< sa_grid_cycle_time/1000000<<" \n =============================== \n\n";
+            cout<<"grid_go_cycle avg time [us] = "<<(float)(sa_grid_cycle_time/cycles)<<"\n for loop avg time is: [us] "<<(float)sa_for_loop_cycle_time/cycles<<". \n";
+            cout<<"total grid cycles [cycles]= "<< sa_grid_cycle_time/1000000<<" \n =============================== \n\n";
         }
     }
-    cout<<"progress - "<<computed<<(100*computed/while_end)<<"% done ...\n";
-    cout<<"cycles done [us] = "<<cycles<<". \n";
-    cout<<"grid_go_cycle avg time [us]= "<<(sa_grid_cycle_time/cycles)/1000<<", for loop avg time is: "<<sa_for_loop_cycle_time/cycles/1000<<". \n";
-    cout<<"total grid cycles [s]= "<< sa_grid_cycle_time/1000000<<" \n ==============================\n\n";
+    cout<<"progress - "<<computed<<"/"<<while_end<<" -> "<<(100*computed/while_end)<<" % done ...\n";
+    cout<<"cycles done = "<<cycles<<". \n\n";
+    cout<<"grid_go_cycle avg time [us] = "<<(float)(sa_grid_cycle_time/cycles)<<"\n for loop avg time is: [us] "<<(float)sa_for_loop_cycle_time/cycles<<". \n";
+    cout<<"total grid cycles [cycles]= "<< sa_grid_cycle_time/1000000<<" \n =============================== \n\n";
 
   	for (uint16_t i=0; i<_dim; i++) {
     	for (uint16_t j=0; j<_dim; j++) {

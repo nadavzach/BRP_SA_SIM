@@ -30,6 +30,7 @@ class TestSa(TestCase):
         enable_pushback      = self.enable_pushback
         enable_low_prec_mult = self.enable_low_prec_mult
         run_pre_saved_configs= self.run_pre_saved_configs
+        run_parallel = self.run_parallel
         
         a_w = self.a_w
         a_h = self.a_h 
@@ -81,7 +82,7 @@ class TestSa(TestCase):
             b.ravel()[b_zero_indices] = 0
 
 
-            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False)
+            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False,False)
             for test_config in test_configs_list:
                 max_depth = test_config[0]
                 threads = test_config[1]
@@ -90,7 +91,7 @@ class TestSa(TestCase):
                 enable_low_prec_mult = test_config[4]
                 #if(not enable_low_prec_mult and not enable_pushback):#not supported ?
                 #   continue 
-                result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult)
+                result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult,run_parallel)
 
                 mse_from_base_line = np.mean((result_tuple[0]-base_line_test_output[0])**2)
                 test_output_tuples_list.append(tuple((test_config,result_tuple)))
@@ -119,8 +120,8 @@ class TestSa(TestCase):
             plot_data(mse_cycles_data,"Cycles","mse")
         else:
 
-            a = np.random.randint(0,20,size = (a_w,a_h,a_c))
-            b = np.random.randint(0,20,size = (b_w,b_h))
+            a = np.random.randint(0,5,size = (a_w,a_h,a_c))
+            b = np.random.randint(0,5,size = (b_w,b_h))
 
             a_num_zeros = int(zero_per * a_w * a_h * a_c)
             a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
@@ -130,9 +131,9 @@ class TestSa(TestCase):
             b.ravel()[b_zero_indices] = 0
 
             print("running base line test... \n\n")
-            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False)
+            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False,False)
             print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+" \n")
-            result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult)
+            result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult,run_parallel)
 
             #calc statistics:
             result                      = result_tuple[0]
@@ -215,6 +216,9 @@ if __name__ == '__main__':
     parser.add_argument('--a_c', type=int,default=5, help='a channels')
     parser.add_argument('--b_h', type=int,default=5, help='b height')
     parser.add_argument('--zero_per', type=int,default=10, help='% of zeros in a and b arrays - o to 100')
+    parser.add_argument('--run_parallel', action='store_true',
+                    help='run simulation on multiple OS threads (default: False)', default=False)
+
     args = parser.parse_args()
     testSa_obj = TestSa()
     testSa_obj.threads = args.threads
@@ -229,6 +233,7 @@ if __name__ == '__main__':
     testSa_obj.a_c = args.a_c
     testSa_obj.b_h = args.b_h
     testSa_obj.zero_per = args.zero_per
+    testSa_obj.run_parallel = args.run_parallel
     #unittest.main()
     testSa_obj.test_brp_sa()
 

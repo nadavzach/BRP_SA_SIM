@@ -3,6 +3,7 @@ import baseline_smt_sa as baseline
 from unittest import TestCase
 import numpy as np
 import random
+import time
 
 def highlight_differences(arr1, arr2):
     """Highlight differences between two numpy arrays."""
@@ -39,25 +40,25 @@ class ExampleTest(TestCase):
         push_back = True
         low_prec_mult = True
         
-        a_w = 5
-        a_h = 5
-        a_d = 5 
+        a_w = 7
+        a_h = 7
+        a_d = 7 
         
         b_w = a_d
-        b_h = 5
-        a = np.random.randint(0,20,size = (a_w,a_h,a_d))
-        b = np.random.randint(0,20,size = (b_w,b_h))
+        b_h = 7
+        a = np.random.randint(-10,10,size = (a_w,a_h,a_d))
+        b = np.random.randint(-10,10,size = (b_w,b_h))
         
         a_mask = np.random.randint(0,2,size = (a_w,a_h,a_d))
         b_mask = np.random.randint(0,2,size = (b_w,b_h))
         a=np.multiply(a,a_mask)
         b=np.multiply(b,b_mask)
-        """print("a array: \n")
-        print(a)
-        print("b array: \n")
-        print(b)
-        print("running first test with run_int8:")"""
-        result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,push_back,low_prec_mult)
+        #print("a array: \n")
+        #print(a)
+        #print("b array: \n")
+        #print(b)
+        #print("running first test with run_int8:")
+        result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a,b,push_back,low_prec_mult,False)
         result = result_tuple[0]
         stats_zero_ops              = result_tuple[1]
         stats_1thread_mult_ops      = result_tuple[2]
@@ -69,14 +70,14 @@ class ExampleTest(TestCase):
 
         stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops
         stats_alu_total = stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops + stats_alu_not_utilized
-        baseline_res = baseline.run_uint8(dim,threads,max_depth,a,b)
+        #baseline_res = baseline.run_int8(dim,threads,max_depth,a,b)
 
         print("finished test, result - \n")
-        print(result.astype(np.uint))
+        print(result)
         print("baseline result - \n")
-        print(baseline_res.astype(np.uint))
+        #print(baseline_res.astype(np.int))
         #print(highlight_differences(result,baseline_res))
-        print((abs(result-baseline_res)).astype(np.uint))
+        #print((abs(result-baseline_res)).astype(np.uint))
         print("stats_total_cycles            :  " +str(stats_total_cycles  ))
         print("stats_total_thread_mult_ops   :  " +str(stats_ops_total ))
         print("stats_zero_ops %              :  " +str(100*stats_zero_ops/stats_ops_total))
@@ -89,11 +90,49 @@ class ExampleTest(TestCase):
 
 
         
-    #def test_example2(self):
-    #    x = np.array([[0., 1.], [2., 3.]])
-    #    res = np.array([[2., 3.], [4., 5.]])
-    #    y = m.example2(x)
-    #    np.testing.assert_allclose(y, res, 1e-12)
+    """def test_example2(self):
+        
+        np.random.seed(0)
+        dim = 14
+        threads = 2
+        alu_num = 1
+        max_depth = 64
+        push_back = True
+        low_prec_mult = True
+        
+        a_w = 40
+        a_h = 40
+        a_c = 40
+        zero_per = 0.7
+        b_w = a_c
+        b_h = 40
+        a = np.random.randint(0,5,size = (a_w,a_h,a_c))
+        b = np.random.randint(0,5,size = (b_w,b_h))
+
+        a_num_zeros = int(zero_per * a_w * a_h * a_c)
+        a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
+        a.ravel()[a_zero_indices] = 0
+        b_num_zeros = int(zero_per * b_w * b_h )
+        b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
+        b.ravel()[b_zero_indices] = 0
+
+        best_dim = 10
+        best_dim_time = 10
+
+        for dim in range(10,20):
+            start = time.time()
+            result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,push_back,low_prec_mult,False)
+            end = time.time()
+            cur_time = end - start
+            if cur_time < best_dim_time:
+                best_dim = dim
+                best_dim_time = cur_time
+        print("best dim: "+str(best_dim))
+        print("best time: "+str(best_dim_time))"""
+            
+
+
+        
 
     #def test_vectorize(self):
     #    x1 = np.array([[0, 1], [2, 3]])

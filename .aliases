@@ -1,5 +1,6 @@
 set MODEL_ROOT  $(pwd)
 export MODEL_ROOT
+export LDFLAGS="-fopenmp"
 alias ali='vim $(pwd)/.aliases'
 alias sali='source $(pwd)/.aliases'
 alias run_test='python3 -m pytest -s $(pwd)/src/cpy_smt_sa/tests/test_extension.py'

@@ -72,7 +72,7 @@ def cpp_flag(compiler):
     """Return the -std=c++14 compiler flag  and errors when the flag is
     no available.
     """
-    if has_flag(compiler, '-std=c++14'):
+    if has_flag(compiler, '-std=c++14') and has_flag(compiler, '-fopenmp'):
         return '-std=c++14'
     else:
         raise RuntimeError('C++14 support is required by xtensor!')
@@ -94,6 +94,7 @@ class BuildExt(build_ext):
         if ct == 'unix':
             opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
             opts.append(cpp_flag(self.compiler))
+            opts.append('-fopenmp')
             if has_flag(self.compiler, '-fvisibility=hidden'):
                 opts.append('-fvisibility=hidden')
         elif ct == 'msvc':

@@ -9,7 +9,7 @@
 #include "node_mem.cpp"
 
 using namespace std;
-
+extern bool _run_parallel;
 template <typename T>
 class grid {
 private:
@@ -118,13 +118,29 @@ void grid<T>::push(xt::xarray<T> &a, xt::xarray<T> &b, uint8_t thread, bool pad)
 
 template <typename T>
 void grid<T>::cycle() {
-    for (uint16_t i=0; i<_dim; i++) {
-        for (uint16_t j=0; j<_dim; j++) {
-            nodes[i][j].go();
+    if(_run_parallel){
+        //#pragma omp parallel for
+        for (uint16_t i=0; i<_dim; i++) {
+            //#pragma omp parallel for
+            for (uint16_t j=0; j<_dim; j++) {
+                nodes[i][j].go();
 
-            for (uint8_t t=0; t<_threads; t++) {
-                nodes[i][j]._buf_a[t].cycle();
-                nodes[i][j]._buf_b[t].cycle();
+                for (uint8_t t=0; t<_threads; t++) {
+                    nodes[i][j]._buf_a[t].cycle();
+                    nodes[i][j]._buf_b[t].cycle();
+                }
+            }
+        }
+    }
+    else{
+        for (uint16_t i=0; i<_dim; i++) {
+            for (uint16_t j=0; j<_dim; j++) {
+                nodes[i][j].go();
+
+                for (uint8_t t=0; t<_threads; t++) {
+                    nodes[i][j]._buf_a[t].cycle();
+                    nodes[i][j]._buf_b[t].cycle();
+                }
             }
         }
     }
