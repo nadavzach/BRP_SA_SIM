@@ -6,6 +6,7 @@ import random
 import argparse
 import matplotlib.pyplot as plt
 import os
+from adjustText import adjust_text
 
 
 
@@ -46,9 +47,9 @@ class TestSa(TestCase):
         if(run_pre_saved_configs):
             max_depth_opts = [1,5,10,20,50,100]
             threads_opts = [1,2,4]
-            alu_num_opts = [1]
-            pushback_opts = [True]
-            low_perc_mult_opts = [True]
+            alu_num_opts = [1,2]
+            pushback_opts = [True,False]
+            low_perc_mult_opts = [True,False]
             arr_list = [max_depth_opts,threads_opts,alu_num_opts,pushback_opts,low_perc_mult_opts]
 
             # Initialize an empty list to store the output tuples
@@ -71,8 +72,8 @@ class TestSa(TestCase):
             print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
 
 
-            a = np.random.randint(0,10,size = (a_w,a_h,a_c))
-            b = np.random.randint(0,10,size = (b_w,b_h))
+            a = np.random.randint(-70,70,size = (a_w,a_h,a_c))
+            b = np.random.randint(-70,70,size = (b_w,b_h))
 
             a_num_zeros = int(zero_per * a_w * a_h * a_c)
             a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
@@ -82,16 +83,18 @@ class TestSa(TestCase):
             b.ravel()[b_zero_indices] = 0
 
 
-            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False,False)
+            base_line_test_output = m.run_int8(dim,1,1,1000,a,b,True,False,False)
             for test_config in test_configs_list:
                 max_depth = test_config[0]
                 threads = test_config[1]
                 alu_num = test_config[2]
                 enable_pushback = test_config[3]
                 enable_low_prec_mult = test_config[4]
-                #if(not enable_low_prec_mult and not enable_pushback):#not supported ?
-                #   continue 
-                result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult,run_parallel)
+
+                dont_run_1 = threads != 4 and alu_num <2
+                if(dont_run_1):#not supported ?
+                   continue 
+                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult,run_parallel)
 
                 test_output_tuples_list.append(tuple((test_config,result_tuple)))
 
@@ -108,8 +111,13 @@ class TestSa(TestCase):
                 
                 test_config = test_output[0]
                 result_tuple = test_output[1]
-                result = result_tuple[0]
+                result = result_tuple[0].astype(np.int32)
 
+                alu_num = test_config[2]
+                buff_size = test_config[0]
+                num_of_threads = test_config[1]
+                enable_pushback = test_config[3]
+                enable_low_prec_mult = test_config[4]
                 #calc statistics:
                 stats_zero_ops              = result_tuple[1]
                 stats_1thread_mult_ops      = result_tuple[2]
@@ -122,28 +130,30 @@ class TestSa(TestCase):
                 stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
                 mse_from_base_line = np.mean((result-base_line_test_output[0])**2)
                 area_calc = 1#TODO
+                stats_alu_total = stats_total_cycles * dim*dim*alu_num
+                alu_utilized = 100*(stats_1thread_mult_ops + stats_multi_thread_mult_ops )/stats_alu_total
 
                 #print(result)
-                print("multi thread mult is % "+str(stats_multi_thread_mult_ops/stats_ops_total))
-                print("mse:" + str(mse_from_base_line))
-                print("su is "+str(stats_speed_up))
+                #print("multi thread mult is % "+str(stats_multi_thread_mult_ops/stats_ops_total))
+                #print("mse:" + str(mse_from_base_line))
+                #print("su is "+str(stats_speed_up))
 
-                mse_acc_spd_up_data.append(tuple((stats_speed_up,mse_from_base_line,("("+str(test_config[0])+","+str(test_config[1])+","+str(test_config[2])+","+str(test_config[3])+","+str(test_config[4])+")"))))
-                buff_size = test_config[0]
-                num_of_threads = test_config[1]
-                if(num_of_threads == 1):
-                    one_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(100-stats_alu_not_utilized)))))
-                    one_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(100-stats_alu_not_utilized)))))
-                elif num_of_threads == 2:
-                    two_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(100-stats_alu_not_utilized)))))
-                    two_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(100-stats_alu_not_utilized)))))
-                elif num_of_threads == 4:
-                    four_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(100-stats_alu_not_utilized)))))
-                    four_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(100-stats_alu_not_utilized)))))
+                mse_acc_spd_up_data.append(tuple((stats_speed_up,mse_from_base_line,("("+str(test_config[0])+","+str(test_config[1])+","+str(test_config[2])+")"))))
+                
+                if(enable_low_prec_mult and enable_pushback):
+                    if(num_of_threads == 1):
+                        one_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
+                        one_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
+                    elif num_of_threads == 2:
+                        two_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
+                        two_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
+                    elif num_of_threads == 4:
+                        four_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+", alu num="+str(alu_num)+" )"))))
+                        four_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+", alu num="+str(alu_num)+" )"))))
 
 
 
-            plot_data(mse_acc_spd_up_data,"speed ip from base line","mse from base line","speed_up_mse__all_configs_graph",True,'labels - (buffer depth,threads,alu num,enable pushback,enable low prec mult')
+            plot_data(mse_acc_spd_up_data,"speed ip from base line","mse from base line","speed_up_mse__all_configs_graph",True,'labels - (buffer depth,threads,alu num)')
 
             plot_data(one_thread_diff_buff_mse_data,"buffer size","mse from base line","one_thread_diff_buffs_mse_graph")
             plot_data(two_thread_diff_buff_mse_data,"buffer size","mse from base line","two_thread_diff_buffs_mse_graph")
@@ -157,8 +167,8 @@ class TestSa(TestCase):
 
         else:
 
-            a = np.random.randint(0,5,size = (a_w,a_h,a_c))
-            b = np.random.randint(0,5,size = (b_w,b_h))
+            a = np.random.randint(-70,70,size = (a_w,a_h,a_c))
+            b = np.random.randint(-70,70,size = (b_w,b_h))
 
             a_num_zeros = int(zero_per * a_w * a_h * a_c)
             a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
@@ -168,12 +178,12 @@ class TestSa(TestCase):
             b.ravel()[b_zero_indices] = 0
 
             print("running base line test... \n\n")
-            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False,False)
+            base_line_test_output = m.run_int8(dim,1,1,1000,a,b,True,False,False)
             print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+" \n")
-            result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult,run_parallel)
+            result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult,run_parallel)
 
             #calc statistics:
-            result                      = result_tuple[0]
+            result                      = result_tuple[0].astype(np.int32)
             stats_zero_ops              = result_tuple[1]
             stats_1thread_mult_ops      = result_tuple[2]
             stats_multi_thread_mult_ops = result_tuple[3]
@@ -183,11 +193,13 @@ class TestSa(TestCase):
             stats_total_cycles          = result_tuple[7]
             stats_speed_up = base_line_test_output[7] / stats_total_cycles
             stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
-            mse_from_base_line = np.mean((result-base_line_test_output[0])**2)
+            diff = (np.abs(result-base_line_test_output[0]))
+            diff_p2 = np.square(diff)
+            mse_from_base_line = np.mean(diff_p2)
             stats_alu_total = stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops + stats_alu_not_utilized
 
             print("finished test, result - \n")
-            print(result.astype(np.uint))
+            print(result)
             print("total cycles                     :  " +str(stats_total_cycles))
             print("speed up from base line          :  " +str(stats_speed_up))
             print("stats_zero_ops %                 :  " +str(100*stats_zero_ops/stats_ops_total             ))
@@ -214,22 +226,25 @@ def plot_data(data,x_label,y_label,fig_save_name,gen_text = False,textstr=""):
 
     # Create the plot
     fig, ax = plt.subplots()
-    fig.set_size_inches(30,30)
+    fig.set_size_inches(20,20)
     ax.scatter(x_vals, y_vals)
     
     # Add labels to each point
+    texts = []
     for i, label in enumerate(labels):
-        ax.annotate(label, (x_vals[i], y_vals[i])).set_fontsize(20)
+        texts.append(plt.text(x_vals[i], y_vals[i],label))
 
     # Set axis labels
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
 
     # add general text to the graph
-    if(gen_test):
+    if(gen_text):
         props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
         ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=14,
                 verticalalignment='top', bbox=props)
+    adjust_text(texts, only_move={'points':'y', 'texts':'y'}, arrowprops=dict(arrowstyle="->", color='r', lw=0.5))
+
     
     # Show the plot
     #plt.show()
