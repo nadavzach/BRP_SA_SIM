@@ -134,7 +134,8 @@ void smt_sa_os<T>::_subtile_range(uint8_t thread, uint16_t &thread_tile_start, u
         thread_tile_end = b_tile_H;
     }
 }
-
+using namespace std;
+using namespace std::chrono;
 template <typename T>
 xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
     assert(tile_vec.size() > 0);
@@ -157,10 +158,17 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
 
     uint32_t computed = 0;
     uint32_t while_end = tile_vec.size() * _dim * _dim;
-
+    int sa_grid_cycle_time =0;
+    int sa_for_loop_cycle_time =0;
+    std::cout<<"  -- starting sagrid cycles --  \n\n";
     while (computed < while_end) {
+        
+        auto start = high_resolution_clock::now();
         sa_grid.cycle();
+        auto end = high_resolution_clock::now();
+        sa_grid_cycle_time += duration_cast<microseconds>(end-start).count();
         cycles++;
+        auto start_for_loop = high_resolution_clock::now();
         for (uint16_t i=0; i<_dim; i++) {
             for (uint16_t j=0; j<_dim; j++) {
                 uint8_t halt_count = 0;
@@ -202,6 +210,9 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
 
         }
 
+        auto end_for_loop = high_resolution_clock::now();
+        sa_for_loop_cycle_time += duration_cast<microseconds>(end_for_loop - start_for_loop).count();
+
         if (sa_grid.mem_a[0]._buf[0].size() < 128) {
             if (global_tile_idx < tile_vec.size()) {
                 tile_a.clear();
@@ -215,7 +226,19 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
                 global_tile_idx++;
             }
         }
+
+        if(cycles%500 == 0 && cycles > 1){
+            cout<<"progress - "<<computed<<"/"<<while_end<<" -> "<<(100*computed/while_end)<<"% done ...\n";
+            cout<<"cycles done = "<<cycles<<". \n\n";
+            cout<<"grid_go_cycle avg time [us] = "<<(sa_grid_cycle_time/cycles)/1000<<", for loop avg time is: [us] "<<sa_for_loop_cycle_time/cycles/1000<<". \n";
+            cout<<"total grid cycles [s]= "<< sa_grid_cycle_time/1000000<<" \n =============================== \n\n";
+        }
     }
+    cout<<"progress - "<<computed<<(100*computed/while_end)<<"% done ...\n";
+    cout<<"cycles done [us] = "<<cycles<<". \n";
+    cout<<"grid_go_cycle avg time [us]= "<<(sa_grid_cycle_time/cycles)/1000<<", for loop avg time is: "<<sa_for_loop_cycle_time/cycles/1000<<". \n";
+    cout<<"total grid cycles [s]= "<< sa_grid_cycle_time/1000000<<" \n ==============================\n\n";
+
   	for (uint16_t i=0; i<_dim; i++) {
     	for (uint16_t j=0; j<_dim; j++) {
 
@@ -258,6 +281,8 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
 
     return result;
 }
+
+
 
 template <typename T>
 xt::xarray<T> smt_sa_os<T>::go(stats_str& stats) {
