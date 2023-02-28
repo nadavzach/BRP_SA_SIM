@@ -131,7 +131,7 @@ class UnfoldConv2d(nn.Module):
         self._prune = prune
         self._quantize = quantize
         self._reorder = 'OFF'
-        self._hw_sim = True
+        self._hw_sim = False
         self._x_bits = 8
         self._w_bits = 8
         self._round = False
