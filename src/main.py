@@ -67,6 +67,8 @@ parser.add_argument('--t1_analysis', action='store_true',
                     help='measure one thread MAC bit-width distribution, set -threads=1')
 parser.add_argument('--gpu', nargs='+', default=None,
                     help='GPU to run on (default: 0)')
+parser.add_argument('--sa_smt_sim', action='store_true',
+                    help='run simulation on cpy_smt_sa (C++) (default: False)', default=False)
 
 
 def prune_network(arch, dataset, train_gen, test_gen, model_chkp=None, desc=None):
@@ -145,7 +147,7 @@ def quantize_network(arch, dataset, train_gen, test_gen, model_chkp=None, only_s
 
 def inference(arch, dataset, test_gen, model_chkp, hw_sim=True, reorder='STATS', x_bits=8, w_bits=8, threads=2,
               is_round=False, hw_type='WA', sparsity=True, mac='2x4bx8b', layers_t2=None, layers_t1=None,
-              t1_analysis=False, desc=None):
+              t1_analysis=False, desc=None, sa_smt_sim=False):
     layers_t1 = [] if layers_t1 is None else layers_t1
     layers_t2 = [] if layers_t2 is None else layers_t2
     name_str = '{}-{}_inference_x-{}_w-{}_{}_{}_spr-{}_reorder-{}_mac-{}_T{}'.format(arch, dataset, x_bits, w_bits,
@@ -157,7 +159,7 @@ def inference(arch, dataset, test_gen, model_chkp, hw_sim=True, reorder='STATS',
     cfg.LOG.start_new_log(name=name_str)
     cfg.LOG.write('desc={}, hw_sim={}, reorder={}, x_bits={}, w_bits={}, is_round={}, hw_type={}, mac={}'
                   .format(desc, hw_sim, reorder, x_bits, w_bits, is_round, hw_type, mac))
-    nn = NeuralNet(arch, dataset, model_chkp=model_chkp)
+    nn = NeuralNet(arch, dataset, model_chkp=model_chkp, sa_smt_sim=sa_smt_sim)
 
     nn.model.bypass_all()
     nn.model.prune_all()
@@ -235,7 +237,7 @@ def main():
                   hw_sim=args.hw_sim, reorder=args.reorder,
                   x_bits=args.x_bits, w_bits=args.w_bits, is_round=(not args.floor), hw_type=args.hw_arch,
                   threads=int(args.threads), sparsity=(not args.disable_sparsity), mac=args.mac,
-                  layers_t2=args.layers_t2, layers_t1=args.layers_t1, t1_analysis=args.t1_analysis, desc=args.desc)
+                  layers_t2=args.layers_t2, layers_t1=args.layers_t1, t1_analysis=args.t1_analysis, desc=args.desc, sa_smt_sim=args.sa_smt_sim)
 
     return
 

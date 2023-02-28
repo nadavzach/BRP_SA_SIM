@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import copy
-import cpy_smt_sa
+import cpy_smt_sa as m
 
 from smt_sa.parallel_smt_sa import ParallelSMTSA
 
@@ -29,7 +29,7 @@ class FloorSTE(torch.autograd.Function):
 
 class SystolicConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0,
-                 dilation=1, groups=1, bias=True, padding_mode='zeros', bypass=False):
+                 dilation=1, groups=1, bias=True, padding_mode='zeros', bypass=False,sa_dim=10, threads=2,alus=1,buf_size=1024):
 
         super(SystolicConv2d, self).__init__()
 
@@ -39,10 +39,15 @@ class SystolicConv2d(nn.Module):
         self._x_max_val = 0
         self._x_min_val = 0
         self._x = None
-        self._hw_sim = False
+        self._hw_sim = True
         self._gather_stats = False
         self._quantize = False
         self._bypass = bypass
+
+        self._threads = threads
+        self._alus = alus
+        self._buf_size = buf_size
+        self._sa_dim = sa_dim
 
     def set_hw_sim(self, val=True):
         self._hw_sim = val
@@ -111,7 +116,7 @@ class SystolicConv2d(nn.Module):
             ##out_unf_ref = x_unf.matmul(w_unf).transpose(1, 2)
 
             # TEST
-            threads = 2
+            """threads = 2
 
             b_vec = w_unf.detach()
             a_vec = x_unf.reshape(x_unf.size(0) * x_unf.size(1), x_unf.size(2)).detach()
@@ -141,19 +146,21 @@ class SystolicConv2d(nn.Module):
                 #FloorSTE.apply(x_unf[quantized_indices[:, 0], quantized_indices[:, 1],
                 #                     quantized_indices[:, 2] + int(x_unf.size(2) / threads)] / 16) * 16
 
-            out_unf = x_unf.matmul(w_unf).transpose(1, 2)
+            #out_unf = x_unf.matmul(w_unf).transpose(1, 2)"""
 
-            #x_unf = x_unf.cpu().detach().numpy()
-            #w_unf = w_unf.cpu().detach().numpy()
+            x_unf = x_unf.cpu().detach().numpy()
+            w_unf = w_unf.cpu().detach().numpy()
 
             # Systolic array simulation
             # TODO: arguments should arrive from command line
             #sa = ParallelSMTSA(16, 2, 4)
             #sa.set_inputs(x_unf, w_unf)
             #out_unf = sa.go()
-
+            print("Going to run cpy_smt_sa simulation now")
+            sa_hw_sim_out = m.run_uint8(self._sa_dim,self._threads,self._alus,self._buf_size,x_unf,w_unf,True,True);
+            out_unf = torch.from_numpy(sa_hw_sim_out[0]).float()
             #out_unf = torch.from_numpy(out_unf).float().cuda()
-            #out_unf = out_unf.transpose(1, 2)
+            out_unf = out_unf.transpose(1, 2)
 
             # Check simulation output
             # TODO: should make the acceptable error in a define
@@ -163,6 +170,30 @@ class SystolicConv2d(nn.Module):
             out = nn.functional.fold(out_unf, (ofmap_height, ofmap_width), (1, 1))
             # Adding the additional bias
             #out = out + self.conv.bias[None, :, None, None]
+
+            stats_zero_ops              = sa_hw_sim_out[1]
+            stats_1thread_mult_ops      = sa_hw_sim_out[2]
+            stats_multi_thread_mult_ops = sa_hw_sim_out[3]
+            stats_buffer_fullness_acc   = sa_hw_sim_out[4]
+            stats_buffer_max_fullness   = sa_hw_sim_out[5]
+            stats_alu_not_utilized      = sa_hw_sim_out[6]
+            stats_total_cycles          = sa_hw_sim_out[7]
+            #stats_speed_up = base_line_test_output[7] / stats_total_cycles
+            stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
+            #mse_from_base_line = np.mean((result-base_line_test_output[0])**2)
+            stats_alu_total = stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops + stats_alu_not_utilized
+
+            print("finished layer, stats: \n")
+            print("total cycles                     :  " +str(stats_total_cycles))
+            #print("speed up from base line          :  " +str(stats_speed_up))
+            print("stats_zero_ops %                 :  " +str(100*stats_zero_ops/stats_ops_total             ))
+            print("stats_1thread_mult_ops %         :  " +str(100*stats_1thread_mult_ops/stats_ops_total     ))
+            print("stats_multi_thread_mult_ops %    :  " +str(100*self._threads*stats_multi_thread_mult_ops/stats_ops_total ))
+            print("stats_total_thread_mult_ops %    :  " +str(stats_ops_total ))
+            print("stats_buffer_fullness_acc        :  " +str(stats_buffer_fullness_acc  ))
+            print("stats_buffer_max_fullness        :  " +str(stats_buffer_max_fullness  ))
+            #print("MSE from base line               :  " +str(mse_from_base_line  ))
+            print("stats_alu_not_utilized %         :  " +str(100*stats_alu_not_utilized/stats_alu_total ))
 
         # Recover previous not quantized weights
         if self._quantize:

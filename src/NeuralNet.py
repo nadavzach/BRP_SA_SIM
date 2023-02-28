@@ -9,7 +9,7 @@ from StatsLogger import StatsLogger
 
 
 class NeuralNet:
-    def __init__(self, arch, dataset, model_chkp=None, pretrained=True):
+    def __init__(self, arch, dataset, model_chkp=None, pretrained=True, sa_smt_sim=False):
         """
         NeuralNet class wraps a model architecture and adds the functionality of training and testing both
         the entire model and the prediction layers.
@@ -34,7 +34,7 @@ class NeuralNet:
         # intended to load user checkpoints. At this point model_chkp and pretrained are not supported together,
         # although it is possible.
         if model_chkp is None:
-            self.model = cfg.MODELS[self.arch](pretrained=pretrained)
+            self.model = cfg.MODELS[self.arch](pretrained=pretrained,sa_smt_sim=sa_smt_sim)
         else:
             self.model = cfg.MODELS[self.arch]()
 

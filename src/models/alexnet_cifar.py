@@ -6,18 +6,25 @@ from SimModel import SimModel
 
 
 class AlexNet(SimModel):
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, sa_smt_sim=True):
         super(AlexNet, self).__init__()
-
+        print("sa_smt_sim ="+str(sa_smt_sim))
         self.relu = nn.ReLU()
         self.maxpool1 = nn.MaxPool2d(kernel_size=2)
         self.maxpool2 = nn.MaxPool2d(kernel_size=3, stride=2)
+        if not sa_smt_sim :
+            self.conv1 = UnfoldConv2d(3, 64, kernel_size=3, stride=1, padding=2)
+            self.conv2 = UnfoldConv2d(64, 192, kernel_size=3, padding=2)
+            self.conv3 = UnfoldConv2d(192, 384, kernel_size=3, padding=1)
+            self.conv4 = UnfoldConv2d(384, 256, kernel_size=3, padding=1,)
+            self.conv5 = UnfoldConv2d(256, 256, kernel_size=3, padding=1)
+        else:
+            self.conv1 = SystolicConv2d(3, 64, kernel_size=3, stride=1, padding=2)
+            self.conv2 = SystolicConv2d(64, 192, kernel_size=3, padding=2)
+            self.conv3 = SystolicConv2d(192, 384, kernel_size=3, padding=1)
+            self.conv4 = SystolicConv2d(384, 256, kernel_size=3, padding=1,)
+            self.conv5 = SystolicConv2d(256, 256, kernel_size=3, padding=1)
 
-        self.conv1 = UnfoldConv2d(3, 64, kernel_size=3, stride=1, padding=2)
-        self.conv2 = UnfoldConv2d(64, 192, kernel_size=3, padding=2)
-        self.conv3 = UnfoldConv2d(192, 384, kernel_size=3, padding=1)
-        self.conv4 = UnfoldConv2d(384, 256, kernel_size=3, padding=1,)
-        self.conv5 = UnfoldConv2d(256, 256, kernel_size=3, padding=1)
 
         self.do1 = nn.Dropout()
         self.fc1 = nn.Linear(4096, 2048)
@@ -65,7 +72,7 @@ def alexnet(num_classes=10, **kwargs):
 
 
 def alexnet_cifar10(**kwargs):
-    return AlexNet(num_classes=10)
+    return AlexNet(num_classes=10)  
 
 
 def alexnet_cifar100(**kwargs):

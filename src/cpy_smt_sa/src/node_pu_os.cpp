@@ -12,6 +12,8 @@
 using namespace std;
 extern bool _node_push_back_en;
 extern bool _node_low_prec_mult_en;
+extern uint64_t max_number;
+extern uint64_t max_number_half_bits;
 template <typename T>
 class node_pu {
 private:
@@ -326,37 +328,48 @@ template <typename T>
 void node_pu<T>::squeeze_and_multiply(uint8_t active_threads,T alu_a_arg_arr[ALU_MAX_OCP],T alu_b_arg_arr[ALU_MAX_OCP],T& _acc){
     int bits = sizeof(T)*8;
     int half_bits = bits/2;
-    T max_half_T_size = pow2(bits/2);
+    T max_half_T_size = max_number_half_bits;
     T max_quarter_T_size = max_half_T_size/2;
     if(active_threads == 2){
         for (uint8_t t=0; t < active_threads; t++) {
-            unsigned int a = (unsigned int)alu_a_arg_arr[t];
-            unsigned int b = (unsigned int)alu_b_arg_arr[t];
-            unsigned int a_msb = a / max_half_T_size;
-            unsigned int a_lsb = (a <<half_bits)>>half_bits;
-            unsigned int b_msb = b / max_half_T_size;
-            unsigned int b_lsb = (b<<half_bits)>>half_bits;
+            bool a_neg = false;
+            bool b_neg = false;
+            int a = alu_a_arg_arr[t];
+            int b = alu_b_arg_arr[t];
+            if( a < 0 ){
+              a_neg = true;
+              a = a*(-1) ;
+            }
+            if( b < 0 ){
+              b_neg = true;
+              b = b*(-1) ;
+            }
+            int sign_a_xor_b = a_neg^b_neg ? -1 : 1;
+            int a_msb = a / max_half_T_size;
+            int a_lsb = (a <<half_bits)>>half_bits;
+            int b_msb = b / max_half_T_size;
+            int b_lsb = (b<<half_bits)>>half_bits;
             if(a_msb*a_lsb*b_msb != 0){
 
                 //std::cout<<"a msb*a lsb*b msb not 0 == 0"<<"\n";
                 if(a_lsb >= max_quarter_T_size) 
                     a_msb += 1; // rounding a's MSB
-                _acc = saturation_op(_acc, (saturation_op(a_msb, b, true) << (bits/2)), false);
+                _acc = saturation_op(_acc, sign_a_xor_b*(saturation_op(a_msb, b, true) << (bits/2)), false);
             }
             else if(a_msb == 0){
                 //std::cout<<"a msb == 0"<<"\n";
-                _acc = saturation_op(_acc, saturation_op(a_lsb, b, true), false);
+                _acc = saturation_op(_acc, sign_a_xor_b*saturation_op(a_lsb, b, true), false);
                 //_acc += a_lsb * b;
             }
             else if(a_lsb == 0){
-                _acc = saturation_op(_acc, (saturation_op(a_msb, b, true) << (bits/2)), false);
+                _acc = saturation_op(_acc, sign_a_xor_b*(saturation_op(a_msb, b, true) << (bits/2)), false);
                 //std::cout<<"a lsb == 0"<<"\n";
                 //_acc += (a_msb * b) << (bits/2);
             }
             else{
 
                 //std::cout<<" else  == 0"<<"\n";
-                _acc = saturation_op(_acc, saturation_op(a, b_lsb, true), false);
+                _acc = saturation_op(_acc, sign_a_xor_b*saturation_op(a, b_lsb, true), false);
                 //_acc += a * b_lsb;
             }
         }
@@ -379,7 +392,6 @@ int node_pu<T>::pow2(int x){
         retval *= 2;
     return retval;
 }
-
 template <typename T>
 void node_pu<T>::reset_acc_t() {
     for (uint8_t t=0; t<_threads; t++)
@@ -404,9 +416,13 @@ void node_pu<T>::cycle() {
 template <typename T>
 T node_pu<T>::saturation_op(T a, T b, bool mult)
 {
-    int bits = sizeof(T)*8;
-    int64_t max_sat = pow2(bits)-1;
+    int64_t max_sat = max_number;
     int64_t min_sat = 0;
+    if(std::is_signed<T>::value){
+        max_sat = max_number/2 - 1;
+        min_sat = (max_number/2)*(-1);
+    }
+    
     int64_t temp_res;
     int64_t a_64 = (int64_t)a;
     int64_t b_64 = (int64_t)b;
