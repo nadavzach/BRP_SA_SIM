@@ -140,7 +140,7 @@ class TestSa(TestCase):
                 stats_total_cycles          = result_tuple[7]
                 stats_speed_up = base_line_test_output[7] / stats_total_cycles
                 stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
-                mse_from_base_line = np.mean((result-base_line_test_output[0])**2)
+                mse_from_base_line = np.mean((dequant_res-base_line_test_output[0])**2)
                 area_calc = 1#TODO
                 stats_alu_total = stats_total_cycles * dim*dim*alu_num
                 alu_utilized = 100*(stats_1thread_mult_ops + stats_multi_thread_mult_ops )/stats_alu_total
