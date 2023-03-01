@@ -40,25 +40,43 @@ class ExampleTest(TestCase):
         push_back = True
         low_prec_mult = True
         
-        a_w = 7
-        a_h = 7
-        a_d = 7 
+        a_w = 3
+        a_h = 3
+        a_d = 3 
         
         b_w = a_d
-        b_h = 7
-        a = np.random.randint(-10,10,size = (a_w,a_h,a_d))
-        b = np.random.randint(-10,10,size = (b_w,b_h))
+        b_h = 3
+        a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_d)).astype(np.float32)
+        b = np.random.uniform(low=-20.0,high=20.0,size = (b_w,b_h)).astype(np.float32)
         
         a_mask = np.random.randint(0,2,size = (a_w,a_h,a_d))
         b_mask = np.random.randint(0,2,size = (b_w,b_h))
         a=np.multiply(a,a_mask)
         b=np.multiply(b,b_mask)
-        #print("a array: \n")
-        #print(a)
+
+        def quantize_to_uint8(x):
+            # Scale float32 values to 0-255 range and convert to uint8
+            x = np.clip(x, 0, 255)
+            x = np.round(x).astype(np.uint8)
+            return x
+
+        def dequantize_to_float32(x):
+            # Convert uint8 values back to float32 and scale to 0-1 range
+            x = np.array(x, dtype=np.float32)
+            x /= 255.0
+            return x
+
+    # Example usage with a 3D numpy array
+        a_int8 = quantize_to_uint8(a)
+        b_int8 = quantize_to_uint8(b)
+        print("a array: \n")
+        print(a)
+        print("a quant: \n")
+        print(a_int8)
         #print("b array: \n")
         #print(b)
         #print("running first test with run_int8:")
-        result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a,b,push_back,low_prec_mult,False)
+        result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_int8,b_int8,push_back,low_prec_mult,False)
         result = result_tuple[0]
         stats_zero_ops              = result_tuple[1]
         stats_1thread_mult_ops      = result_tuple[2]
@@ -73,7 +91,7 @@ class ExampleTest(TestCase):
         #baseline_res = baseline.run_int8(dim,threads,max_depth,a,b)
 
         print("finished test, result - \n")
-        print(result)
+        print(dequantize_to_float32(result))
         print("baseline result - \n")
         #print(baseline_res.astype(np.int))
         #print(highlight_differences(result,baseline_res))

@@ -7,12 +7,21 @@ import argparse
 import matplotlib.pyplot as plt
 import os
 
+def quantize_to_uint8(x):
+            # Scale float32 values to 0-255 range and convert to uint8
+            x = np.clip(x, 0, 255)
+            x = np.round(x).astype(np.uint8)
+            return x
 
+def dequantize_to_float32(x):
+            # Convert uint8 values back to float32 and scale to 0-1 range
+            x = np.array(x, dtype=np.float32)
+            x /= 255.0
+            return x
 
 
 class TestSa(TestCase):
 
-   
     def test_brp_sa(self):
         stats_zero_ops = 0
         stats_1thread_mult_ops = 0
@@ -71,8 +80,8 @@ class TestSa(TestCase):
             print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
 
 
-            a = np.random.randint(0,20,size = (a_w,a_h,a_c))
-            b = np.random.randint(0,20,size = (b_w,b_h))
+            a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_d)).astype(np.float32)
+            b = np.random.uniform(low=-20.0,high=20.0,size = (b_w,b_h)).astype(np.float32)
 
             a_num_zeros = int(zero_per * a_w * a_h * a_c)
             a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
@@ -81,8 +90,9 @@ class TestSa(TestCase):
             b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
             b.ravel()[b_zero_indices] = 0
 
-
-            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False,False)
+            a_int8 = quantize_to_uint8(a)
+            b_int8 = quantize_to_uint8(b)
+            base_line_test_output = m.run_int8(dim,1,1,1000,a_int8,b_int8,True,False,False)
             for test_config in test_configs_list:
                 max_depth = test_config[0]
                 threads = test_config[1]
@@ -91,9 +101,10 @@ class TestSa(TestCase):
                 enable_low_prec_mult = test_config[4]
                 #if(not enable_low_prec_mult and not enable_pushback):#not supported ?
                 #   continue 
-                result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult,run_parallel)
-
-                mse_from_base_line = np.mean((result_tuple[0]-base_line_test_output[0])**2)
+                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_int8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
+                dequant_res = dequantize_to_float32(result_tuple[0])
+                dequant_res_baseline = dequantize_to_float32(base_line_test_output[0])
+                mse_from_base_line = np.mean((dequant_res-dequant_res_baseline)**2)
                 test_output_tuples_list.append(tuple((test_config,result_tuple)))
 
             mse_cycles_data = []
@@ -101,7 +112,7 @@ class TestSa(TestCase):
                 
                 test_config = test_output[0]
                 result_tuple = test_output[1]
-                result = result_tuple[0]
+                dequant_res = dequantize_to_float32(result_tuple[0])
 
                 #calc statistics:
                 stats_zero_ops              = result_tuple[1]
@@ -112,7 +123,7 @@ class TestSa(TestCase):
                 stats_alu_not_utilized      = result_tuple[6]
                 stats_total_cycles          = result_tuple[7]
                 stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
-                mse_from_base_line = np.mean((result-base_line_test_output[0])**2)
+                mse_from_base_line = np.mean((dequant_res-dequant_res_baseline)**2)
                 print(mse_from_base_line)
                 print(test_config)
 
@@ -129,14 +140,16 @@ class TestSa(TestCase):
             b_num_zeros = int(zero_per * b_w * b_h )
             b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
             b.ravel()[b_zero_indices] = 0
-
+            a_int8 = quantize_to_uint8(a)
+            b_int8 = quantize_to_uint8(b)
             print("running base line test... \n\n")
-            base_line_test_output = m.run_uint8(dim,1,1,1000,a,b,True,False,False)
+            base_line_test_output = m.run_int8(dim,1,1,1000,a_int8,b_int8,True,False,False)
             print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+" \n")
-            result_tuple = m.run_uint8(dim,threads,alu_num,max_depth,a,b,enable_pushback,enable_low_prec_mult,run_parallel)
-
+            result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_int8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
+            
+            dequant_res_baseline = dequantize_to_float32(base_line_test_output[0])
             #calc statistics:
-            result                      = result_tuple[0]
+            dequant_res                 = dequantize_to_float32(result_tuple[0])
             stats_zero_ops              = result_tuple[1]
             stats_1thread_mult_ops      = result_tuple[2]
             stats_multi_thread_mult_ops = result_tuple[3]
@@ -146,11 +159,11 @@ class TestSa(TestCase):
             stats_total_cycles          = result_tuple[7]
             stats_speed_up = base_line_test_output[7] / stats_total_cycles
             stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
-            mse_from_base_line = np.mean((result-base_line_test_output[0])**2)
+            mse_from_base_line = np.mean((dequant_res-dequant_res_baseline)**2)
             stats_alu_total = stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops + stats_alu_not_utilized
 
             print("finished test, result - \n")
-            print(result.astype(np.uint))
+            print(dequant_res)
             print("total cycles                     :  " +str(stats_total_cycles))
             print("speed up from base line          :  " +str(stats_speed_up))
             print("stats_zero_ops %                 :  " +str(100*stats_zero_ops/stats_ops_total             ))
