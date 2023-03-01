@@ -16,6 +16,10 @@ bool _node_low_prec_mult_en = false;
 bool _run_parallel = false;
 uint64_t max_number;
 uint64_t max_number_half_bits;
+int signed_max_number; 
+int signed_min_number; 
+
+
 int pow2(int x){
     int retval = 1;
     for(int i = 0 ; i<x ; i++)
@@ -30,6 +34,9 @@ inline std::tuple<xt::pyarray<uint8_t>,float , float ,float, float ,float ,float
 	int bits = sizeof(uint8_t)*8;
 	max_number = pow2(bits)-1;
 	max_number_half_bits = pow2(bits/2);
+	signed_max_number = pow2(bits)/2-1;
+	signed_min_number = -pow2(bits)/2;
+	cout<<"signed max and min: "<<signed_max_number<< " " <<signed_min_number;
 	
 	stats_str stats;
 	_node_push_back_en = push_back_en;
@@ -58,9 +65,12 @@ inline std::tuple<xt::pyarray<int8_t>,float , float ,float, float ,float ,float 
 	uint16_t dim, uint8_t threads,uint8_t alu_num, uint16_t max_depth, xt::pyarray<int8_t> &a, xt::pyarray<int8_t> &b,
 	bool push_back_en, bool low_prec_mult_en, bool run_parallel)
 {
-	int bits = sizeof(int8_t)*8;
+	int bits = sizeof(uint8_t)*8;
 	max_number = pow2(bits)-1;
 	max_number_half_bits = pow2(bits/2);
+	signed_max_number = pow2(bits)/2-1;
+	signed_min_number = -pow2(bits)/2;
+	
 	
 	stats_str stats;
 	_node_push_back_en = push_back_en;

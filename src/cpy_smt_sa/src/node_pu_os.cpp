@@ -14,6 +14,8 @@ extern bool _node_push_back_en;
 extern bool _node_low_prec_mult_en;
 extern uint64_t max_number;
 extern uint64_t max_number_half_bits;
+extern int signed_max_number; 
+extern int signed_min_number; 
 template <typename T>
 class node_pu {
 private:
@@ -344,32 +346,35 @@ void node_pu<T>::squeeze_and_multiply(uint8_t active_threads,T alu_a_arg_arr[ALU
               b_neg = true;
               b = b*(-1) ;
             }
+            unsigned int ua = (unsigned int)a;
+            unsigned int ub = (unsigned int)b;
+            
             int sign_a_xor_b = a_neg^b_neg ? -1 : 1;
-            int a_msb = a / max_half_T_size;
-            int a_lsb = (a <<half_bits)>>half_bits;
-            int b_msb = b / max_half_T_size;
-            int b_lsb = (b<<half_bits)>>half_bits;
+            unsigned int a_msb = ua / max_half_T_size;
+            unsigned int a_lsb = (ua <<half_bits)>>half_bits;
+            unsigned int b_msb = ub / max_half_T_size;
+            unsigned int b_lsb = (ub<<half_bits)>>half_bits;
             if(a_msb*a_lsb*b_msb != 0){
 
                 //std::cout<<"a msb*a lsb*b msb not 0 == 0"<<"\n";
                 if(a_lsb >= max_quarter_T_size) 
                     a_msb += 1; // rounding a's MSB
-                _acc = saturation_op(_acc, sign_a_xor_b*(saturation_op(a_msb, b, true) << (bits/2)), false);
+                _acc = saturation_op(_acc, sign_a_xor_b*((saturation_op(a_msb, ub, true) << (bits/2))), false);
             }
             else if(a_msb == 0){
                 //std::cout<<"a msb == 0"<<"\n";
-                _acc = saturation_op(_acc, sign_a_xor_b*saturation_op(a_lsb, b, true), false);
+                _acc = saturation_op(_acc, sign_a_xor_b*saturation_op(a_lsb, ub, true), false);
                 //_acc += a_lsb * b;
             }
             else if(a_lsb == 0){
-                _acc = saturation_op(_acc, sign_a_xor_b*(saturation_op(a_msb, b, true) << (bits/2)), false);
+                _acc = saturation_op(_acc, sign_a_xor_b*((saturation_op(a_msb, ub, true) << (bits/2))), false);
                 //std::cout<<"a lsb == 0"<<"\n";
                 //_acc += (a_msb * b) << (bits/2);
             }
             else{
 
                 //std::cout<<" else  == 0"<<"\n";
-                _acc = saturation_op(_acc, sign_a_xor_b*saturation_op(a, b_lsb, true), false);
+                _acc = saturation_op(_acc, sign_a_xor_b*saturation_op(ua, b_lsb, true), false);
                 //_acc += a * b_lsb;
             }
         }
@@ -419,8 +424,8 @@ T node_pu<T>::saturation_op(T a, T b, bool mult)
     int64_t max_sat = max_number;
     int64_t min_sat = 0;
     if(std::is_signed<T>::value){
-        max_sat = max_number/2 - 1;
-        min_sat = (max_number/2)*(-1);
+        max_sat = signed_max_number;
+        min_sat = signed_min_number;
     }
     
     int64_t temp_res;
