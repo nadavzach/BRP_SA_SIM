@@ -2,6 +2,7 @@ import cpy_smt_sa as m
 from unittest import TestCase
 import unittest
 import numpy as np
+import pandas as pd
 import random
 import argparse
 import matplotlib.pyplot as plt
@@ -79,7 +80,7 @@ class TestSa(TestCase):
             print(" b is of size ("+str(b_w)+" x "+str(b_h)+")\n")
             print(" the systolic array is of size (" +str(dim) +" x " + str(dim)+")\n ")
             print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
-            a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_d)).astype(np.float32)
+            a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_c)).astype(np.float32)
             b = np.random.uniform(low=-20.0,high=20.0,size = (b_w,b_h)).astype(np.float32)
 
 
@@ -108,29 +109,7 @@ class TestSa(TestCase):
                 dequant_res = dequantize_to_float32(result_tuple[0])
                 dequant_res_baseline = dequantize_to_float32(base_line_test_output[0])
                 mse_from_base_line = np.mean((dequant_res-dequant_res_baseline)**2)
-                test_output_tuples_list.append(tuple((test_config,result_tuple)))
 
-            mse_acc_spd_up_data = []
-            one_thread_diff_buff_mse_data = []
-            two_thread_diff_buff_mse_data = []
-            four_thread_diff_buff_mse_data = []
-            one_thread_diff_buff_su_data = []
-            two_thread_diff_buff_su_data = []
-            four_thread_diff_buff_su_data = []
-
-            #creating for each thread config a speed-up - mse_Acc graph
-            for test_output in test_output_tuples_list:
-                
-                test_config = test_output[0]
-                result_tuple = test_output[1]
-                dequant_res = dequantize_to_float32(result_tuple[0])
-
-                alu_num = test_config[2]
-                buff_size = test_config[0]
-                num_of_threads = test_config[1]
-                enable_pushback = test_config[3]
-                enable_low_prec_mult = test_config[4]
-                #calc statistics:
                 stats_zero_ops              = result_tuple[1]
                 stats_1thread_mult_ops      = result_tuple[2]
                 stats_multi_thread_mult_ops = result_tuple[3]
@@ -145,35 +124,84 @@ class TestSa(TestCase):
                 stats_alu_total = stats_total_cycles * dim*dim*alu_num
                 alu_utilized = 100*(stats_1thread_mult_ops + stats_multi_thread_mult_ops )/stats_alu_total
 
-                #print(result)
-                #print("multi thread mult is % "+str(stats_multi_thread_mult_ops/stats_ops_total))
-                #print("mse:" + str(mse_from_base_line))
-                #print("su is "+str(stats_speed_up))
-
-                mse_acc_spd_up_data.append(tuple((stats_speed_up,mse_from_base_line,("("+str(test_config[0])+","+str(test_config[1])+","+str(test_config[2])+")"))))
-                
-                if(enable_low_prec_mult and enable_pushback):
-                    if(num_of_threads == 1):
-                        one_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
-                        one_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
-                    elif num_of_threads == 2:
-                        two_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
-                        two_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
-                    elif num_of_threads == 4:
-                        four_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+", alu num="+str(alu_num)+" )"))))
-                        four_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+", alu num="+str(alu_num)+" )"))))
+                all_result_tuple = tuple((stats_zero_ops,stats_1thread_mult_ops,stats_multi_thread_mult_ops,stats_buffer_fullness_acc,stats_buffer_max_fullness,stats_alu_not_utilized,stats_total_cycles,stats_speed_up,stats_ops_total,stats_speed_up,area_calc,alu_utilized))
 
 
 
-            plot_data(mse_acc_spd_up_data,"speed ip from base line","mse from base line","speed_up_mse__all_configs_graph",True,'labels - (buffer depth,threads,alu num)')
 
-            plot_data(one_thread_diff_buff_mse_data,"buffer size","mse from base line","one_thread_diff_buffs_mse_graph")
-            plot_data(two_thread_diff_buff_mse_data,"buffer size","mse from base line","two_thread_diff_buffs_mse_graph")
-            plot_data(four_thread_diff_buff_mse_data,"buffer size","mse from base line","four_thread_diff_buffs_mse_graph")
 
-            plot_data(one_thread_diff_buff_su_data,"buffer size","speed_up from base line","one_thread_diff_buffs_speed_up_graph")
-            plot_data(two_thread_diff_buff_su_data,"buffer size","speed_up from base line","two_thread_diff_buffs_speed_up_graph")
-            plot_data(four_thread_diff_buff_su_data,"buffer size","speed_up from base line","four_thread_diff_buffs_speed_up_graph")
+
+
+
+
+
+
+
+
+
+                test_output_tuples_list.append(tuple((test_config,all_result_tuple)))
+            create_excel_table(test_output_tuples_list, "pre_saved_configs_test_outputs", './src/cpy_smt_sa/tests/results/')
+
+            #mse_acc_spd_up_data = []
+            #one_thread_diff_buff_mse_data = []
+            #two_thread_diff_buff_mse_data = []
+            #four_thread_diff_buff_mse_data = []
+            #one_thread_diff_buff_su_data = []
+            #two_thread_diff_buff_su_data = []
+            #four_thread_diff_buff_su_data = []
+
+            #creating for each thread config a speed-up - mse_Acc graph
+            #for test_output in test_output_tuples_list:
+            #    
+            #    test_config = test_output[0]
+            #    result_tuple = test_output[1]
+            #    dequant_res = dequantize_to_float32(result_tuple[0])
+
+            #    alu_num = test_config[2]
+            #    buff_size = test_config[0]
+            #    num_of_threads = test_config[1]
+            #    enable_pushback = test_config[3]
+            #    enable_low_prec_mult = test_config[4]
+            #    #calc statistics:
+            #    stats_zero_ops              = result_tuple[1]
+            #    stats_1thread_mult_ops      = result_tuple[2]
+            #    stats_multi_thread_mult_ops = result_tuple[3]
+            #    stats_buffer_fullness_acc   = result_tuple[4]
+            #    stats_buffer_max_fullness   = result_tuple[5]
+            #    stats_alu_not_utilized      = result_tuple[6]
+            #    stats_total_cycles          = result_tuple[7]
+            #    stats_speed_up = base_line_test_output[7] / stats_total_cycles
+            #    stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
+            #    mse_from_base_line = np.mean((dequant_res-base_line_test_output[0])**2)
+            #    area_calc = 1#TODO
+            #    stats_alu_total = stats_total_cycles * dim*dim*alu_num
+            #    alu_utilized = 100*(stats_1thread_mult_ops + stats_multi_thread_mult_ops )/stats_alu_total
+
+
+            #    mse_acc_spd_up_data.append(tuple((stats_speed_up,mse_from_base_line,("("+str(test_config[0])+","+str(test_config[1])+","+str(test_config[2])+")"))))
+            #    
+            #    if(enable_low_prec_mult and enable_pushback):
+            #        if(num_of_threads == 1):
+            #            one_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
+            #            one_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
+            #        elif num_of_threads == 2:
+            #            two_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
+            #            two_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+" )"))))
+            #        elif num_of_threads == 4:
+            #            four_thread_diff_buff_mse_data.append(tuple((buff_size,mse_from_base_line,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+", alu num="+str(alu_num)+" )"))))
+            #            four_thread_diff_buff_su_data.append(tuple((buff_size,stats_speed_up,("( area= "+str(area_calc) + ", alu util ="+str(alu_utilized)+", alu num="+str(alu_num)+" )"))))
+
+
+
+            #plot_data(mse_acc_spd_up_data,"speed ip from base line","mse from base line","speed_up_mse__all_configs_graph",True,'labels - (buffer depth,threads,alu num)')
+
+            #plot_data(one_thread_diff_buff_mse_data,"buffer size","mse from base line","one_thread_diff_buffs_mse_graph")
+            #plot_data(two_thread_diff_buff_mse_data,"buffer size","mse from base line","two_thread_diff_buffs_mse_graph")
+            #plot_data(four_thread_diff_buff_mse_data,"buffer size","mse from base line","four_thread_diff_buffs_mse_graph")
+
+            #plot_data(one_thread_diff_buff_su_data,"buffer size","speed_up from base line","one_thread_diff_buffs_speed_up_graph")
+            #plot_data(two_thread_diff_buff_su_data,"buffer size","speed_up from base line","two_thread_diff_buffs_speed_up_graph")
+            #plot_data(four_thread_diff_buff_su_data,"buffer size","speed_up from base line","four_thread_diff_buffs_speed_up_graph")
 
                 
 
@@ -266,6 +294,26 @@ def plot_data(data,x_label,y_label,fig_save_name,gen_text = False,textstr=""):
     if(os.path.exists(path)):
         os.remove(path)
     plt.savefig(path)
+
+def create_excel_table(test_output_tuples_list, filename, path):
+
+    df = pd.DataFrame(columns= range(len(test_output_tuples_list[0][1])))
+
+    i =0
+    for j, (config, result) in enumerate(test_output_tuples_list):
+        num_nans = len(df.columns) - len(config)
+        data_to_add = config + (np.nan,) * num_nans
+        df.loc[i] = data_to_add
+        df.loc[i+1] = result
+        i=i+2
+    
+    writer = pd.ExcelWriter(path + filename + '.xlsx')
+    df.to_excel(writer, sheet_name='Sheet1', index=False)
+    writer.save()
+
+
+
+
 
 
 if __name__ == '__main__':
