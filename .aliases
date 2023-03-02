@@ -4,6 +4,7 @@ export LDFLAGS="-fopenmp"
 alias ali='vim $(pwd)/.aliases'
 alias sali='source $(pwd)/.aliases'
 alias run_test='python3 -m pytest -s $(pwd)/src/cpy_smt_sa/tests/test_extension.py'
+alias run_new_test='python3 ./src/cpy_smt_sa/tests/test_sa.py' 
 alias build_smt_sa='rm $(pwd)/src/cpy_smt_sa/build/lib.linux-x86_64-3.10/cpy_smt_sa.cpython-310-x86_64-linux-gnu.so ; pip3 install $(pwd)/src/cpy_smt_sa'
 alias build_baseline='rm $(pwd)/Baseline-SMT-SA/baseline_smt_sa/build/lib.linux-x86_64-3.10/baseline_smt_sa.cpython-310-x86_64-linux-gnu.so ; pip3 install $(pwd)/Baseline-SMT-SA/baseline_smt_sa'
 alias which='type'

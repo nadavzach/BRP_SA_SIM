@@ -7,22 +7,38 @@ import argparse
 import matplotlib.pyplot as plt
 import os
 from adjustText import adjust_text
+import sys
 
 def quantize_to_uint8(x):
             # Scale float32 values to 0-255 range and convert to uint8
-            x = np.clip(x, 0, 255)
-            x = np.round(x).astype(np.uint8)
+            x = np.clip(x, -127, 128)
+            x = np.round(x).astype(np.int8)
             return x
 
-def dequantize_to_float32(x):
+def dequantize_to_float32(x,x_delta,y_delta):
             # Convert uint8 values back to float32 and scale to 0-1 range
             x = np.array(x, dtype=np.float32)
-            x /= 255.0
+            x = x * x_delta * y_delta
             return x
-
+def uniform_quantization_a(x):
+        bits = 8
+        x_max = np.max(x)
+        N = 2**bits
+        delta = x_max / N
+        x_int = np.round(x / delta)
+        x_q = np.clip(x_int, 0, N - 1)
+        return x_q, delta
+def uniform_quantization_b(x):
+        bits = 8
+        x_max = np.max(x)
+        N = 2**bits
+        delta = x_max / N
+        x_int = np.round(x / delta)
+        x_q = np.clip(x_int, -N/2, N/2 - 1)
+        return x_q, delta
 
 class TestSa(TestCase):
-
+    
     def test_brp_sa(self):
         stats_zero_ops = 0
         stats_1thread_mult_ops = 0
@@ -79,7 +95,7 @@ class TestSa(TestCase):
             print(" b is of size ("+str(b_w)+" x "+str(b_h)+")\n")
             print(" the systolic array is of size (" +str(dim) +" x " + str(dim)+")\n ")
             print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
-            a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_d)).astype(np.float32)
+            a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_c)).astype(np.float32)
             b = np.random.uniform(low=-20.0,high=20.0,size = (b_w,b_h)).astype(np.float32)
 
 
@@ -89,10 +105,10 @@ class TestSa(TestCase):
             b_num_zeros = int(zero_per * b_w * b_h )
             b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
             b.ravel()[b_zero_indices] = 0
-
-            a_int8 = quantize_to_uint8(a)
-            b_int8 = quantize_to_uint8(b)
-            base_line_test_output = m.run_int8(dim,1,1,1000,a_int8,b_int8,True,False,False)
+            
+            a_uint8, a_delta = uniform_quantization_a(a)
+            b_int8,b_delta = uniform_quantization_b(b)
+            base_line_test_output = m.run_int8(dim,1,1,1000,a_uint8,b_int8,True,False,False)
             for test_config in test_configs_list:
                 max_depth = test_config[0]
                 threads = test_config[1]
@@ -104,9 +120,9 @@ class TestSa(TestCase):
                 dont_run_1 = threads != 4 and alu_num <2
                 if(dont_run_1):#not supported ?
                    continue 
-                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_int8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
-                dequant_res = dequantize_to_float32(result_tuple[0])
-                dequant_res_baseline = dequantize_to_float32(base_line_test_output[0])
+                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
+                dequant_res = dequantize_to_float32(result_tuple[0],a_delta,b_delta)
+                dequant_res_baseline = dequantize_to_float32(base_line_test_output[0],a_delta,b_delta)
                 mse_from_base_line = np.mean((dequant_res-dequant_res_baseline)**2)
                 test_output_tuples_list.append(tuple((test_config,result_tuple)))
 
@@ -179,8 +195,8 @@ class TestSa(TestCase):
 
         else:
 
-            a = np.random.randint(-70,70,size = (a_w,a_h,a_c))
-            b = np.random.randint(-70,70,size = (b_w,b_h))
+            a = np.random.uniform(low=-50.0,high=50.0,size = (a_w,a_h,a_c)).astype(np.float32)
+            b = np.random.uniform(low=-50.0,high=50.0,size = (b_w,b_h)).astype(np.float32)
 
             a_num_zeros = int(zero_per * a_w * a_h * a_c)
             a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
@@ -188,16 +204,16 @@ class TestSa(TestCase):
             b_num_zeros = int(zero_per * b_w * b_h )
             b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
             b.ravel()[b_zero_indices] = 0
-            a_int8 = quantize_to_uint8(a)
-            b_int8 = quantize_to_uint8(b)
+            a_uint8, a_delta = uniform_quantization_a(a)
+            b_int8,b_delta = uniform_quantization_b(b)
             print("running base line test... \n\n")
-            base_line_test_output = m.run_int8(dim,1,1,1000,a_int8,b_int8,True,False,False)
+            base_line_test_output = m.run_int8(dim,1,1,1000,a_uint8,b_int8,True,False,False)
             print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+" \n")
-            result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_int8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
+            result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
             
-            dequant_res_baseline = dequantize_to_float32(base_line_test_output[0])
+            dequant_res = dequantize_to_float32(result_tuple[0],a_delta,b_delta)
+            dequant_res_baseline = dequantize_to_float32(base_line_test_output[0],a_delta,b_delta)
             #calc statistics:
-            dequant_res                 = dequantize_to_float32(result_tuple[0])
             stats_zero_ops              = result_tuple[1]
             stats_1thread_mult_ops      = result_tuple[2]
             stats_multi_thread_mult_ops = result_tuple[3]

@@ -328,7 +328,7 @@ bool node_pu<T>::try_pushback(uint8_t thread) {
 
 template <typename T>
 void node_pu<T>::squeeze_and_multiply(uint8_t active_threads,T alu_a_arg_arr[ALU_MAX_OCP],T alu_b_arg_arr[ALU_MAX_OCP],T& _acc){
-    int bits = sizeof(T)*8;
+    int bits = 8;
     int half_bits = bits/2;
     T max_half_T_size = max_number_half_bits;
     T max_quarter_T_size = max_half_T_size/2;

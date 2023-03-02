@@ -61,11 +61,11 @@ inline std::tuple<xt::pyarray<uint8_t>,float , float ,float, float ,float ,float
 
     return std::make_tuple(res,stats_zero_ops,stats_1thread_mult_ops,stats_multi_thread_mult_ops,stats_buffer_fullness_acc,stats_buffer_max_fullness,stats_alu_not_utilized,stats_total_cycles);
 }
-inline std::tuple<xt::pyarray<int8_t>,float , float ,float, float ,float ,float ,float > run_int8(
-	uint16_t dim, uint8_t threads,uint8_t alu_num, uint16_t max_depth, xt::pyarray<int8_t> &a, xt::pyarray<int8_t> &b,
+inline std::tuple<xt::pyarray<int32_t>,float , float ,float, float ,float ,float ,float > run_int8(
+	uint16_t dim, uint8_t threads,uint8_t alu_num, uint16_t max_depth, xt::pyarray<int32_t> &a, xt::pyarray<int32_t> &b,
 	bool push_back_en, bool low_prec_mult_en, bool run_parallel)
 {
-	int bits = sizeof(uint8_t)*8;
+	int bits = 8;
 	max_number = pow2(bits)-1;
 	max_number_half_bits = pow2(bits/2);
 	signed_max_number = pow2(bits)/2-1;
@@ -76,10 +76,10 @@ inline std::tuple<xt::pyarray<int8_t>,float , float ,float, float ,float ,float 
 	_node_push_back_en = push_back_en;
 	_node_low_prec_mult_en = low_prec_mult_en;
 	_run_parallel = run_parallel;
-    smt_sa_os<int8_t> sa(dim, threads,alu_num, max_depth);
+    smt_sa_os<int32_t> sa(dim, threads,alu_num, max_depth);
     sa.set_inputs(a, b);
 	auto start = high_resolution_clock::now();
-	xt::pyarray<int8_t> res = sa.go(stats);
+	xt::pyarray<int32_t> res = sa.go(stats);
     auto end = high_resolution_clock::now();
 	cout<<"$$$$ Total test runtime   :   "<<duration_cast<microseconds>(end-start).count()<<"[us]"<<endl;
 
