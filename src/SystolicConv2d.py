@@ -3,9 +3,27 @@ import torch.nn as nn
 import copy
 import cpy_smt_sa as m
 import baseline_smt_sa as baseline
+import numpy as np
 
 from smt_sa.parallel_smt_sa import ParallelSMTSA
 
+def uniform_quantization_x(x):
+        bits = 8
+        x_max = x.max().cpu()
+        N = 2**bits
+        delta = torch.abs(x_max) / N
+        x_int = RoundSTE.apply(x / delta)
+        x_q = torch.clamp(x_int, 0, N-1)
+        return x_q, delta
+def uniform_quantization_w(x):
+        bits = 8
+        x_max = x.max().cpu()
+        x_min = x.min().cpu()
+        N = 2**bits
+        delta = max(torch.abs(x_min), torch.abs(x_max)) * 2 / N
+        x_int = RoundSTE.apply(x / delta)
+        x_q = torch.clamp(x_int, -N/2, N/2 -1)
+        return x_q, delta
 
 # Round implementation with straight-through estimator in backprop
 class RoundSTE(torch.autograd.Function):
@@ -42,7 +60,7 @@ class SystolicConv2d(nn.Module):
         self._x = None
         self._hw_sim = True
         self._gather_stats = False
-        self._quantize = False
+        self._quantize = True
         self._bypass = bypass
 
         self._threads = threads
@@ -78,14 +96,10 @@ class SystolicConv2d(nn.Module):
         w_bak = None
         if self._quantize:
             # Activations quantization
-            ##self._x_max_val = max(x.max(), self._x_max_val)
-            ##self._x_min_val = min(x.min(), self._x_min_val)
-            ##x = self._uniform_symmetric_quantization(x, self._x_min_val, self._x_max_val, 8)
+            x,x_delta = uniform_quantization_x(x)
 
             # Weights quantization
-            w_max_val = self.conv.weight.data.max()
-            w_min_val = self.conv.weight.data.min()
-            w = self._uniform_symmetric_quantization(self.conv.weight.data, w_min_val, w_max_val, 8)
+            w,w_delta = uniform_quantization_w(self.conv.weight.data)
 
             w_bak = copy.deepcopy(self.conv.weight.data)
             self.conv.weight.data = w
@@ -114,7 +128,7 @@ class SystolicConv2d(nn.Module):
                 int((x.size(3) + 2 * self.conv.padding[1] - self.conv.kernel_size[1] + self.conv.stride[1])
                     / self.conv.stride[1])
 
-            ##out_unf_ref = x_unf.matmul(w_unf).transpose(1, 2)
+            #out_unf_ref = x_unf.matmul(w_unf).transpose(1, 2)
 
             # TEST
             """threads = 2
@@ -158,9 +172,9 @@ class SystolicConv2d(nn.Module):
             #sa.set_inputs(x_unf, w_unf)
             #out_unf = sa.go()
             print("Going to run cpy_smt_sa simulation now")
-            #sa_hw_sim_out = m.run_uint8(self._sa_dim,self._threads,self._alus,self._buf_size,x_unf,w_unf,True,True);
-            sa_hw_sim_out = baseline.run_int32(self._sa_dim,self._threads,self._buf_size,x_unf,w_unf);
-            out_unf = torch.from_numpy(sa_hw_sim_out).float()
+            sa_hw_sim_out = m.run_int8(self._sa_dim,self._threads,self._alus,self._buf_size,x_unf,w_unf,True,True,False);
+            #sa_hw_sim_out = baseline.run_int32(self._sa_dim,self._threads,self._buf_size,x_unf,w_unf);
+            out_unf = torch.from_numpy(sa_hw_sim_out[0]).float()
             #out_unf = torch.from_numpy(out_unf).float().cuda()
             out_unf = out_unf.transpose(1, 2)
 
@@ -199,10 +213,10 @@ class SystolicConv2d(nn.Module):
 
         # Recover previous not quantized weights
         if self._quantize:
-            #self.conv.weight.data = w_bak
+            self.conv.weight.data = w_bak
             #self.conv.bias.data = b_bak
 
-            #out = out * x_delta * w_delta
-            out = out + self.conv.bias[None, :, None, None]
+            out = out * x_delta * w_delta
+            #out = out + self.conv.bias[None, :, None, None]
 
         return out
