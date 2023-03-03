@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import copy
 import cpy_smt_sa as m
+import baseline_smt_sa as baseline
 
 from smt_sa.parallel_smt_sa import ParallelSMTSA
 
@@ -157,8 +158,9 @@ class SystolicConv2d(nn.Module):
             #sa.set_inputs(x_unf, w_unf)
             #out_unf = sa.go()
             print("Going to run cpy_smt_sa simulation now")
-            sa_hw_sim_out = m.run_uint8(self._sa_dim,self._threads,self._alus,self._buf_size,x_unf,w_unf,True,True);
-            out_unf = torch.from_numpy(sa_hw_sim_out[0]).float()
+            #sa_hw_sim_out = m.run_uint8(self._sa_dim,self._threads,self._alus,self._buf_size,x_unf,w_unf,True,True);
+            sa_hw_sim_out = baseline.run_int32(self._sa_dim,self._threads,self._buf_size,x_unf,w_unf);
+            out_unf = torch.from_numpy(sa_hw_sim_out).float()
             #out_unf = torch.from_numpy(out_unf).float().cuda()
             out_unf = out_unf.transpose(1, 2)
 
@@ -171,7 +173,7 @@ class SystolicConv2d(nn.Module):
             # Adding the additional bias
             #out = out + self.conv.bias[None, :, None, None]
 
-            stats_zero_ops              = sa_hw_sim_out[1]
+            """stats_zero_ops              = sa_hw_sim_out[1]
             stats_1thread_mult_ops      = sa_hw_sim_out[2]
             stats_multi_thread_mult_ops = sa_hw_sim_out[3]
             stats_buffer_fullness_acc   = sa_hw_sim_out[4]
@@ -193,7 +195,7 @@ class SystolicConv2d(nn.Module):
             print("stats_buffer_fullness_acc        :  " +str(stats_buffer_fullness_acc  ))
             print("stats_buffer_max_fullness        :  " +str(stats_buffer_max_fullness  ))
             #print("MSE from base line               :  " +str(mse_from_base_line  ))
-            print("stats_alu_not_utilized %         :  " +str(100*stats_alu_not_utilized/stats_alu_total ))
+            print("stats_alu_not_utilized %         :  " +str(100*stats_alu_not_utilized/stats_alu_total ))"""
 
         # Recover previous not quantized weights
         if self._quantize:
