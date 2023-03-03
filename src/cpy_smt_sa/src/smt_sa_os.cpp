@@ -56,6 +56,7 @@ public:
     void get_tile(vector<xt::xarray<T>> &tile_a, vector<xt::xarray<T>> &tile_b, tile_idx t_idx);
     xt::xarray<T> go(stats_str& stats);
     xt::xarray<T> go(vector<tile_idx> &tile_vec,stats_str& stats);
+    xt::xarray<T> go_cuda(vector<tile_idx> &tile_vec,stats_str& stats);
 };
 
 template <typename T>
@@ -325,6 +326,10 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
 
     return result;
 }
+
+
+
+
 
 
 
