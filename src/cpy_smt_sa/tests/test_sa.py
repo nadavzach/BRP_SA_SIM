@@ -1,20 +1,11 @@
 import cpy_smt_sa as m
 from unittest import TestCase
-import unittest
 import numpy as np
 import pandas as pd
-import random
 import argparse
 import matplotlib.pyplot as plt
 import os
 from adjustText import adjust_text
-import sys
-
-def quantize_to_uint8(x):
-            # Scale float32 values to 0-255 range and convert to uint8
-            x = np.clip(x, -127, 128)
-            x = np.round(x).astype(np.int8)
-            return x
 
 def dequantize_to_float32(x,x_delta,y_delta):
             # Convert uint8 values back to float32 and scale to 0-1 range
@@ -32,8 +23,10 @@ def uniform_quantization_a(x):
 def uniform_quantization_b(x):
         bits = 8
         x_max = np.max(x)
+        x_min = np.min(x)
         N = 2**bits
-        delta = x_max / N
+        delta = max(abs(x_min), abs(x_max)) * 2 / N
+        #delta = x_max / N
         x_int = np.round(x / delta)
         x_q = np.clip(x_int, -N/2, N/2 - 1)
         return x_q, delta
@@ -98,7 +91,10 @@ class TestSa(TestCase):
             print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
             a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_c)).astype(np.float32)
             b = np.random.uniform(low=-20.0,high=20.0,size = (b_w,b_h)).astype(np.float32)
-
+            
+            # This is for Python to print floats in a readable way
+            np.set_printoptions(precision=3)
+            np.set_printoptions(suppress=True)
 
             a_num_zeros = int(zero_per * a_w * a_h * a_c)
             a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
@@ -141,20 +137,6 @@ class TestSa(TestCase):
                 alu_utilized = 100*(stats_1thread_mult_ops + stats_multi_thread_mult_ops )/stats_alu_total
 
                 all_result_tuple = tuple((stats_zero_ops,stats_1thread_mult_ops,stats_multi_thread_mult_ops,stats_buffer_fullness_acc,stats_buffer_max_fullness,stats_alu_not_utilized,stats_total_cycles,stats_speed_up,stats_ops_total,stats_speed_up,area_calc,alu_utilized))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                 test_output_tuples_list.append(tuple((test_config,all_result_tuple)))
             create_excel_table(test_output_tuples_list, "pre_saved_configs_test_outputs", './src/cpy_smt_sa/tests/results/')
 
@@ -225,7 +207,11 @@ class TestSa(TestCase):
 
             a = np.random.uniform(low=-50.0,high=50.0,size = (a_w,a_h,a_c)).astype(np.float32)
             b = np.random.uniform(low=-50.0,high=50.0,size = (b_w,b_h)).astype(np.float32)
-
+            
+            # This is for Python to print floats in a readable way
+            np.set_printoptions(precision=3)
+            np.set_printoptions(suppress=True)
+            
             a_num_zeros = int(zero_per * a_w * a_h * a_c)
             a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
             a.ravel()[a_zero_indices] = 0
@@ -255,6 +241,7 @@ class TestSa(TestCase):
             diff_p2 = np.square(diff)
             mse_from_base_line = np.mean(diff_p2)
             stats_alu_total = stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops + stats_alu_not_utilized
+            
 
             print("finished test, result - \n")
             print(dequant_res)

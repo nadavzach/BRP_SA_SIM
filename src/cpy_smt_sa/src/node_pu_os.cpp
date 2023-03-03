@@ -338,6 +338,12 @@ void node_pu<T>::squeeze_and_multiply(uint8_t active_threads,T alu_a_arg_arr[ALU
             bool b_neg = false;
             int a = alu_a_arg_arr[t];
             int b = alu_b_arg_arr[t];
+            if((a > 255) || (a < 0) || (b > 127) || (b < -128)){
+                cout<<"!!! ERROR a / b out of range!!!"<<endl;
+                cout<<"!!! a = "<<a<<" !!!"<<endl;
+                cout<<"!!! b = "<<b<<" !!!"<<endl;
+            }
+            
             if( a < 0 ){
               a_neg = true;
               a = a*(-1) ;
@@ -348,7 +354,7 @@ void node_pu<T>::squeeze_and_multiply(uint8_t active_threads,T alu_a_arg_arr[ALU
             }
             unsigned int ua = (unsigned int)a;
             unsigned int ub = (unsigned int)b;
-            
+
             int sign_a_xor_b = a_neg^b_neg ? -1 : 1;
             unsigned int a_msb = ua / max_half_T_size;
             unsigned int a_lsb = (ua <<half_bits)>>half_bits;
@@ -359,23 +365,24 @@ void node_pu<T>::squeeze_and_multiply(uint8_t active_threads,T alu_a_arg_arr[ALU
                 //std::cout<<"a msb*a lsb*b msb not 0 == 0"<<"\n";
                 if(a_lsb >= max_quarter_T_size) 
                     a_msb += 1; // rounding a's MSB
-                _acc = saturation_op(_acc, sign_a_xor_b*((saturation_op(a_msb, ub, true) << (bits/2))), false);
+                //_acc = saturation_op(_acc, sign_a_xor_b*((saturation_op(a_msb, ub, true) << (bits/2))), false);
+                _acc += sign_a_xor_b * ((a_msb * ub) << half_bits);
             }
             else if(a_msb == 0){
                 //std::cout<<"a msb == 0"<<"\n";
-                _acc = saturation_op(_acc, sign_a_xor_b*saturation_op(a_lsb, ub, true), false);
-                //_acc += a_lsb * b;
+                //_acc = saturation_op(_acc, sign_a_xor_b*saturation_op(a_lsb, ub, true), false);
+                _acc += sign_a_xor_b * (a_lsb * b);
             }
             else if(a_lsb == 0){
-                _acc = saturation_op(_acc, sign_a_xor_b*((saturation_op(a_msb, ub, true) << (bits/2))), false);
+                //_acc = saturation_op(_acc, sign_a_xor_b*((saturation_op(a_msb, ub, true) << (bits/2))), false);
                 //std::cout<<"a lsb == 0"<<"\n";
-                //_acc += (a_msb * b) << (bits/2);
+                _acc += sign_a_xor_b * ((a_msb * ub) << half_bits);
             }
             else{
 
                 //std::cout<<" else  == 0"<<"\n";
-                _acc = saturation_op(_acc, sign_a_xor_b*saturation_op(ua, b_lsb, true), false);
-                //_acc += a * b_lsb;
+                //_acc = saturation_op(_acc, sign_a_xor_b*saturation_op(ua, b_lsb, true), false);
+                _acc += sign_a_xor_b * (ua * b_lsb);
             }
         }
     }
@@ -383,10 +390,10 @@ void node_pu<T>::squeeze_and_multiply(uint8_t active_threads,T alu_a_arg_arr[ALU
         T a,b;
         a = alu_a_arg_arr[0];
         b = alu_b_arg_arr[0];
-        T first_op = saturation_op(a, b, true);
-        _acc = saturation_op(_acc,first_op , false);
+        //T first_op = saturation_op(a, b, true);
+        //_acc = saturation_op(_acc,first_op , false);
         //std::cout<<"1 active thread" <<(uint32_t)a<<" "<<(uint32_t)b<<" "<<(uint32_t)first_op<<" "<<(uint32_t)_acc<<"\n";
-        //_acc = a * b;
+        _acc += a * b;
     }
 }
 
