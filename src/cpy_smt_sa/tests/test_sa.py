@@ -51,6 +51,7 @@ class TestSa(TestCase):
         enable_low_prec_mult = self.enable_low_prec_mult
         run_pre_saved_configs= self.run_pre_saved_configs
         run_parallel = self.run_parallel
+        run_special = False
         
         a_w = self.a_w
         a_h = self.a_h 
@@ -114,7 +115,7 @@ class TestSa(TestCase):
                 enable_low_prec_mult = test_config[4]
                 #if(not enable_low_prec_mult and not enable_pushback):#not supported ?
                 #   continue 
-                dont_run_1 = threads == 4 and alu_num <2
+                dont_run_1 = threads == 1 and alu_num == 2
                 if(dont_run_1):#not supported ?
                    continue 
                 result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
@@ -202,7 +203,84 @@ class TestSa(TestCase):
             #plot_data(four_thread_diff_buff_su_data,"buffer size","speed_up from base line","four_thread_diff_buffs_speed_up_graph")
 
                 
+        elif run_special:
+            max_depth_opts = [1,5,10,50]
+            threads_opts = [1,2,4]
+            alu_num_opts = [1,2]
+            pushback_opts = [True]
+            low_perc_mult_opts = [True]
+            sa_dim_opts = range(15,22,2)
+            arr_list = [max_depth_opts,threads_opts,alu_num_opts,pushback_opts,low_perc_mult_opts,sa_dim_opts]
 
+            # Initialize an empty list to store the output tuples
+            test_configs_list = []
+
+            # Use NumPy's `meshgrid` function to create a grid of indices for each input array
+            grid = np.meshgrid(*[np.arange(len(arr)) for arr in arr_list])
+
+            # Use NumPy's `stack` function to combine the indices into a single 2D array
+            indices = np.stack(grid, axis=-1).reshape(-1, len(arr_list))
+
+            # Iterate over the indices and create a tuple with the corresponding values from each input array
+            for index in indices:
+                test_configs_list.append(tuple(arr[index[i]] for i, arr in enumerate(arr_list)))
+            test_output_tuples_list =[]
+            print("SA configuration:\n")
+            print(" a is of size ("+str(a_w)+" x "+str(a_h)+" x "+str(a_c)+")\n")
+            print(" b is of size ("+str(b_w)+" x "+str(b_h)+")\n")
+            print(" the systolic array is of size (" +str(dim) +" x " + str(dim)+")\n ")
+            print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
+            a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_c)).astype(np.float32)
+            b = np.random.uniform(low=-20.0,high=20.0,size = (b_w,b_h)).astype(np.float32)
+            
+            # This is for Python to print floats in a readable way
+            np.set_printoptions(precision=3)
+            np.set_printoptions(suppress=True)
+
+            a_num_zeros = int(zero_per * a_w * a_h * a_c)
+            a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
+            a.ravel()[a_zero_indices] = 0
+            b_num_zeros = int(zero_per * b_w * b_h )
+            b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
+            b.ravel()[b_zero_indices] = 0
+            
+            a_uint8, a_delta = uniform_quantization_a(a)
+            b_int8,b_delta = uniform_quantization_b(b)
+            base_line_test_output = m.run_int8(3,1,1,1000,a_uint8,b_int8,True,False,False)
+            for test_config in test_configs_list:
+                max_depth = test_config[0]
+                threads = test_config[1]
+                alu_num = test_config[2]
+                enable_pushback = test_config[3]
+                enable_low_prec_mult = test_config[4]
+                dim = test_config[5]
+                #if(not enable_low_prec_mult and not enable_pushback):#not supported ?
+                #   continue 
+                dont_run_1 = (threads == 1 and alu_num == 2)
+                if(dont_run_1):#not supported ?
+                   continue 
+                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
+                dequant_res = dequantize_to_float32(result_tuple[0],a_delta,b_delta)
+                dequant_res_baseline = dequantize_to_float32(base_line_test_output[0],a_delta,b_delta)
+                
+
+                stats_zero_ops              = result_tuple[1]
+                stats_1thread_mult_ops      = result_tuple[2]
+                stats_multi_thread_mult_ops = result_tuple[3]
+                stats_buffer_fullness_acc   = result_tuple[4]
+                stats_buffer_max_fullness   = result_tuple[5]
+                stats_alu_not_utilized      = result_tuple[6]
+                stats_total_cycles          = result_tuple[7]
+                stats_speed_up = base_line_test_output[7] / stats_total_cycles
+                stats_ops_total = stats_zero_ops + stats_1thread_mult_ops + 2*stats_multi_thread_mult_ops;
+                mse_from_base_line = np.mean((dequant_res-dequant_res_baseline)**2)
+                area_calc = 1#TODO
+                stats_alu_total = stats_total_cycles * dim*dim*alu_num
+                alu_utilized = 100*(stats_1thread_mult_ops + stats_multi_thread_mult_ops )/stats_alu_total
+
+                all_result_tuple = tuple((stats_zero_ops,stats_1thread_mult_ops,stats_multi_thread_mult_ops,stats_buffer_fullness_acc,stats_buffer_max_fullness,stats_alu_not_utilized,stats_total_cycles,stats_speed_up,stats_ops_total,mse_from_base_line,area_calc,alu_utilized))
+                test_output_tuples_list.append(tuple((test_config,all_result_tuple)))
+            create_excel_table_special(test_output_tuples_list, "pre_saved_configs_test_outputs", './src/cpy_smt_sa/tests/results/') 
         else:
 
             a = np.random.uniform(low=-50.0,high=50.0,size = (a_w,a_h,a_c)).astype(np.float32)
@@ -314,7 +392,22 @@ def create_excel_table(test_output_tuples_list, filename, path):
     writer = pd.ExcelWriter(path + filename + '.xlsx')
     df.to_excel(writer, sheet_name='Sheet1', index=False)
     writer.save()
+def create_excel_table_special(test_output_tuples_list, filename, path):
 
+    df = pd.DataFrame(columns= range(len(test_output_tuples_list[0][1])+len(test_output_tuples_list[0][0])))
+    header = tuple(("max_depth","threads","alu_num","pushback","low_prec_mult","dim","zero_ops","1thread_mult_ops","multi_thread_mult_ops","buffer_fullness_acc","buffer_max_fullness","alu_not_utilized","total_cycles","speed_up","ops_total","mse_from_base_line","area_calc","alu_utilized"))
+    df.loc[0] = header
+    i =1
+    for j, (config, result) in enumerate(test_output_tuples_list):
+        num_nans = len(df.columns) - len(config)
+        data_to_add = config + result#(np.nan,) * num_nans
+        df.loc[i] = data_to_add
+        #df.loc[i+1] = result
+        i=i+1
+    
+    writer = pd.ExcelWriter(path + filename + '.xlsx')
+    df.to_excel(writer, sheet_name='Sheet1', index=False)
+    writer.save()
 
 
 
@@ -328,11 +421,11 @@ if __name__ == '__main__':
     parser.add_argument('--buffer_size',default=5, type=int, help='buffer size')
     parser.add_argument('--enable_pushback',default=True, type=int, help='enable push back')
     parser.add_argument('--enable_low_prec_mult',default=True, type=int, help='enable low precision multiplication on alu')
-    parser.add_argument('--run_pre_saved_configs', type=int, help='run hard coded simulations for number of threads (1,2,4),buffer size (1,5,10,20,50,100), pushback(true,false)')
-    parser.add_argument('--a_w', type=int,default=20, help='a width')
-    parser.add_argument('--a_h', type=int,default=20, help='a height')
-    parser.add_argument('--a_c', type=int,default=20, help='a channels')
-    parser.add_argument('--b_h', type=int,default=20, help='b height')
+    parser.add_argument('--run_pre_saved_configs',default=False, action='store_true', help='run hard coded simulations for number of threads (1,2,4),buffer size (1,5,10,20,50,100), pushback(true,false)')
+    parser.add_argument('--a_w', type=int,default=50, help='a width')
+    parser.add_argument('--a_h', type=int,default=50, help='a height')
+    parser.add_argument('--a_c', type=int,default=50, help='a channels')
+    parser.add_argument('--b_h', type=int,default=50, help='b height')
     parser.add_argument('--zero_per', type=int,default=10, help='% of zeros in a and b arrays - o to 100')
     parser.add_argument('--run_parallel', action='store_true',
                     help='run simulation on multiple OS threads (default: False)', default=False)
