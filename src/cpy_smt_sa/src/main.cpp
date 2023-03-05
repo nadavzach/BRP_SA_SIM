@@ -14,7 +14,7 @@ namespace py = pybind11;
 bool _node_push_back_en = false;
 bool _node_low_prec_mult_en = false;
 bool _run_parallel = false;
-bool _new_sched_en = false;
+int _scheduler = 0;
 uint64_t max_number;
 uint64_t max_number_half_bits;
 int signed_max_number; 
@@ -42,7 +42,6 @@ inline std::tuple<xt::pyarray<uint8_t>,float , float ,float, float ,float ,float
 	stats_str stats;
 	_node_push_back_en = push_back_en;
 	_node_low_prec_mult_en = low_prec_mult_en;
-	_new_sched_en = new_sched_en;
     smt_sa_os<uint8_t> sa(dim, threads,alu_num, max_depth);
     sa.set_inputs(a, b);
 	auto start = high_resolution_clock::now();
@@ -64,7 +63,7 @@ inline std::tuple<xt::pyarray<uint8_t>,float , float ,float, float ,float ,float
 }
 inline std::tuple<xt::pyarray<int32_t>,float , float ,float, float ,float ,float ,float > run_int8(
 	uint16_t dim, uint8_t threads,uint8_t alu_num, uint16_t max_depth, xt::pyarray<int32_t> &a, xt::pyarray<int32_t> &b,
-	bool push_back_en, bool low_prec_mult_en, bool new_sched_en)
+	bool push_back_en, bool low_prec_mult_en, int scheduler)
 {
 	int bits = 8;
 	max_number = pow2(bits)-1;
@@ -76,7 +75,7 @@ inline std::tuple<xt::pyarray<int32_t>,float , float ,float, float ,float ,float
 	stats_str stats;
 	_node_push_back_en = push_back_en;
 	_node_low_prec_mult_en = low_prec_mult_en;
-	_new_sched_en = new_sched_en;
+	_scheduler = scheduler;
     smt_sa_os<int32_t> sa(dim, threads,alu_num, max_depth);
     sa.set_inputs(a, b);
 	auto start = high_resolution_clock::now();

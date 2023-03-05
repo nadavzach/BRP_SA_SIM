@@ -51,7 +51,7 @@ class TestSa(TestCase):
         enable_low_prec_mult = self.enable_low_prec_mult
         run_pre_saved_configs= self.run_pre_saved_configs
         run_parallel = self.run_parallel
-        new_sched_en = self.new_sched_en
+        scheduler = self.scheduler
         run_special = False
         
         a_w = self.a_w
@@ -120,7 +120,7 @@ class TestSa(TestCase):
                 if(dont_run_1):#not supported ?
                    continue
                 #new_sched_en = True
-                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,new_sched_en)
+                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,scheduler)
                 dequant_res = dequantize_to_float32(result_tuple[0],a_delta,b_delta)
                 dequant_res_baseline = dequantize_to_float32(base_line_test_output[0],a_delta,b_delta)
                 
@@ -262,7 +262,7 @@ class TestSa(TestCase):
                 if(dont_run_1):#not supported ?
                    continue
                 
-                result_tuple = m.run_int8(10,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,new_sched_en)
+                result_tuple = m.run_int8(10,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,scheduler)
                 dequant_res = dequantize_to_float32(result_tuple[0],a_delta,b_delta)
                 dequant_res_baseline = dequantize_to_float32(base_line_test_output[0],a_delta,b_delta)
                 
@@ -303,8 +303,8 @@ class TestSa(TestCase):
             b_int8,b_delta = uniform_quantization_b(b)
             print("running base line test... \n\n")
             base_line_test_output = m.run_int8(dim,1,1,1000,a_uint8,b_int8,True,False,False)
-            print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+ ", new sched= " +str(new_sched_en)+" \n")
-            result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,new_sched_en)
+            print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+ ", sched= " +str(scheduler)+" \n")
+            result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,scheduler)
             
             dequant_res = dequantize_to_float32(result_tuple[0],a_delta,b_delta)
             dequant_res_baseline = dequantize_to_float32(base_line_test_output[0],a_delta,b_delta)
@@ -432,8 +432,8 @@ if __name__ == '__main__':
     parser.add_argument('--zero_per', type=int,default=10, help='% of zeros in a and b arrays - o to 100')
     parser.add_argument('--run_parallel', action='store_true',
                     help='run simulation on multiple OS threads (default: False)', default=False)
-    parser.add_argument('--new_sched_en', action='store_true',
-                    help='run simulation with new scheduler (default: False)', default=False)
+    parser.add_argument('--scheduler',default=0 ,type=int,
+                    help='0: FIFO , 1: LRU , 2: Optimized LRU')
 
     args = parser.parse_args()
     testSa_obj = TestSa()
@@ -450,6 +450,6 @@ if __name__ == '__main__':
     testSa_obj.b_h = args.b_h
     testSa_obj.zero_per = args.zero_per
     testSa_obj.run_parallel = args.run_parallel
-    testSa_obj.new_sched_en = args.new_sched_en
+    testSa_obj.scheduler = args.scheduler
     #unittest.main()
     testSa_obj.test_brp_sa()
