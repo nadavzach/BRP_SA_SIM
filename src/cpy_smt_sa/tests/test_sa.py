@@ -51,6 +51,7 @@ class TestSa(TestCase):
         enable_low_prec_mult = self.enable_low_prec_mult
         run_pre_saved_configs= self.run_pre_saved_configs
         run_parallel = self.run_parallel
+        scheduler = self.scheduler
         run_special = False
         
         a_w = self.a_w
@@ -123,8 +124,9 @@ class TestSa(TestCase):
                 #   continue 
                 dont_run_1 = threads == 1 and alu_num == 2
                 if(dont_run_1):#not supported ?
-                   continue 
-                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
+                   continue
+                #new_sched_en = True
+                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,scheduler)
                 dequant_res = dequantize_to_float32(result_tuple[0],a_delta,b_delta)
                 dequant_res_baseline = dequantize_to_float32(base_line_test_output[0],a_delta,b_delta)
                 
@@ -215,8 +217,8 @@ class TestSa(TestCase):
             alu_num_opts = [1,2]
             pushback_opts = [True]
             low_perc_mult_opts = [True]
-            sa_dim_opts = range(15,22,2)
-            arr_list = [max_depth_opts,threads_opts,alu_num_opts,pushback_opts,low_perc_mult_opts,sa_dim_opts]
+            zero_per_opts = range(30,81,10)
+            arr_list = [max_depth_opts,threads_opts,alu_num_opts,pushback_opts,low_perc_mult_opts,zero_per_opts]
 
             # Initialize an empty list to store the output tuples
             test_configs_list = []
@@ -256,8 +258,9 @@ class TestSa(TestCase):
                 #   continue 
                 dont_run_1 = (threads == 1 and alu_num == 2)
                 if(dont_run_1):#not supported ?
-                   continue 
-                result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
+                   continue
+                
+                result_tuple = m.run_int8(10,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,scheduler)
                 dequant_res = dequantize_to_float32(result_tuple[0],a_delta,b_delta)
                 dequant_res_baseline = dequantize_to_float32(base_line_test_output[0],a_delta,b_delta)
                 
@@ -290,8 +293,8 @@ class TestSa(TestCase):
          
             print("running base line test... \n\n")
             base_line_test_output = m.run_int8(dim,1,1,1000,a_uint8,b_int8,True,False,False)
-            print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+" \n")
-            result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,run_parallel)
+            print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+ ", sched= " +str(scheduler)+" \n")
+            result_tuple = m.run_int8(dim,threads,alu_num,max_depth,a_uint8,b_int8,enable_pushback,enable_low_prec_mult,scheduler)
             
             dequant_res = dequantize_to_float32(result_tuple[0],a_delta,b_delta)
             dequant_res_baseline = dequantize_to_float32(base_line_test_output[0],a_delta,b_delta)
@@ -385,7 +388,7 @@ def create_excel_table(test_output_tuples_list, filename, path):
 def create_excel_table_special(test_output_tuples_list, filename, path):
 
     df = pd.DataFrame(columns= range(len(test_output_tuples_list[0][1])+len(test_output_tuples_list[0][0])))
-    header = tuple(("max_depth","threads","alu_num","pushback","low_prec_mult","dim","zero_ops","1thread_mult_ops","multi_thread_mult_ops","buffer_fullness_acc","buffer_max_fullness","alu_not_utilized","total_cycles","speed_up","ops_total","mse_from_base_line","area_calc","alu_utilized"))
+    header = tuple(("max_depth","threads","alu_num","pushback","low_prec_mult","zero percent","zero_ops","1thread_mult_ops","multi_thread_mult_ops","buffer_fullness_acc","buffer_max_fullness","alu_not_utilized","total_cycles","speed_up","ops_total","mse_from_base_line","area_calc","alu_utilized"))
     df.loc[0] = header
     i =1
     for j, (config, result) in enumerate(test_output_tuples_list):
@@ -422,6 +425,8 @@ if __name__ == '__main__':
     parser.add_argument('--zero_per', type=int,default=10, help='% of zeros in a and b arrays - o to 100')
     parser.add_argument('--run_parallel', action='store_true',
                     help='run simulation on multiple OS threads (default: False)', default=False)
+    parser.add_argument('--scheduler',default=0 ,type=int,
+                    help='0: FIFO , 1: LRU , 2: Optimized LRU')
 
     args = parser.parse_args()
     testSa_obj = TestSa()
@@ -441,5 +446,6 @@ if __name__ == '__main__':
     testSa_obj.saved_b_mat_path = args.saved_b_mat_path
     testSa_obj.saved_a_mat_path = args.saved_a_mat_path
     testSa_obj.run_parallel = args.run_parallel
+    testSa_obj.scheduler = args.scheduler
     #unittest.main()
     testSa_obj.test_brp_sa()

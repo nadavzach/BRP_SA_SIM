@@ -271,12 +271,12 @@ xt::xarray<T> smt_sa_os<T>::go(vector<tile_idx> &tile_vec,stats_str& stats) {
             }
         }
 
-        if(cycles%500 == 0 && cycles > 1){
+        /*if(cycles%500 == 0 && cycles > 1){
             cout<<"progress - "<<computed<<"/"<<while_end<<" -> "<<(100*computed/while_end)<<" % done ...\n";
             cout<<"cycles done = "<<cycles<<". \n\n";
             cout<<"grid_go_cycle avg time [us] = "<<(float)(sa_grid_cycle_time/cycles)<<"\n for loop avg time is: [us] "<<(float)sa_for_loop_cycle_time/cycles<<". \n";
             cout<<"total grid cycles [cycles]= "<< sa_grid_cycle_time/1000000<<" \n =============================== \n\n";
-        }
+        }*/
     }
     cout<<"progress - "<<computed<<"/"<<while_end<<" -> "<<(100*computed/while_end)<<" % done ...\n";
     cout<<"cycles done = "<<cycles<<". \n\n";

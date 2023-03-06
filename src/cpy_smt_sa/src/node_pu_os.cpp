@@ -16,6 +16,7 @@ extern uint64_t max_number;
 extern uint64_t max_number_half_bits;
 extern int signed_max_number; 
 extern int signed_min_number; 
+extern int _scheduler;
 template <typename T>
 class node_pu {
 private:
@@ -27,7 +28,7 @@ private:
     vector<uint32_t> _acc_t;
     vector<bool> _halt;
     bool _is_util;
-    vector<uint8_t> _LRU;
+    vector<uint8_t> _sched;
 	float _stats_zero_ops=0;
 	float _stats_1thread_mult_ops=0;
 	float _stats_multi_thread_mult_ops=0;
@@ -71,10 +72,11 @@ public:
 
     // NB_SMT Project Aux Functions
     void squeeze_and_multiply(uint8_t active_threads,T alu_a_arg_arr[ALU_MAX_OCP],T alu_b_arg_arr[ALU_MAX_OCP], T& _acc);
-    void check_and_reset_LRU();
+    void check_and_reset_sched();
 	int pow2(int x);
 	void peek(T& x,bool& is_empty, bool buf, uint8_t thread);
 	bool try_pushback(uint8_t thread);
+    uint8_t choose_thread();
 };
 
 template <typename T>
@@ -83,14 +85,14 @@ node_pu<T>::node_pu (string name, uint8_t threads,uint8_t alu_num, uint16_t max_
     _buf_b.reserve(threads);
     _acc_t.reserve(threads);
     _halt.reserve(threads);
-    _LRU.reserve(threads);
+    _sched.reserve(threads);
 
     for (uint8_t i=0; i<threads; i++) {
         _buf_a.push_back(fifo<T>("fifo_a_" + name));
         _buf_b.push_back(fifo<T>("fifo_b_" + name));
         _acc_t.push_back(0);
         _halt.push_back(false);
-        _LRU.push_back(0);
+        _sched.push_back(0);
     }
 }
 
@@ -187,15 +189,14 @@ void node_pu<T>::go() {
     for (uint8_t i=0; i<_alu_num; i++) {
 		alu_ocp_arr[i] = -1;
 	}
-    //std::cout<<"LRU: ["<<(int)_LRU[0]<<","<<(int)_LRU[1]<<","<<(int)_LRU[2]<<","<<(int)_LRU[3]<<"]"<<std::endl;
-    //sleep(1);
-    check_and_reset_LRU();
+    if(_scheduler != 0)
+        check_and_reset_sched();
     for (uint8_t t=0; t<_threads; t++) {
-        
+            
 		th_op_arr[t] = -1;
 		th_valid_arr[t] =is_valid(t) && !is_halt(t) && is_ready_out(t) ; 
 
-        if (th_valid_arr[t] && (_LRU[t] == 0)) {
+        if (th_valid_arr[t] && ((_scheduler != 0) ? (_sched[t] == 0) : true)) {
             //std::cout<<"Thread "<<(int)t<<"executing"<<std::endl;
             peek(a[t],is_a_empty,0,t);
             peek(b[t],is_b_empty,1,t);
@@ -207,7 +208,8 @@ void node_pu<T>::go() {
                         if(	alu_ocp_arr[i] == -1){
                             th_op_arr[t] = i;
                             //std::cout<<"thread: "<<(int)t<<" took the ALU"<<std::endl;
-                            _LRU[t] = 1;
+                            if(_scheduler != 0)
+                                _sched[t] = 1;
                             alu_ocp_arr[i] = 1;
                             break;
                         }
@@ -222,7 +224,8 @@ void node_pu<T>::go() {
                             for(uint8_t i=0;i<_alu_num;i++){				
                                 if(	alu_ocp_arr[i] < (_node_low_prec_mult_en ? ALU_MAX_OCP : 1)){
                                     th_op_arr[t] = i;
-                                    _LRU[t] = 1;
+                                    if(_scheduler != 0)
+                                        _sched[t] = 1;
                                     alu_ocp_arr[i]++;
                                     break;
                                 }
@@ -241,6 +244,8 @@ void node_pu<T>::go() {
                 }
                 else {
                     th_op_arr[t] = -3; //zero operation
+                    if(_scheduler == 1)
+                        _sched[t] = 1;
                     //std::cout<<"a["<<(unsigned int)t<<"] = "<<(unsigned int)a[t];
                     //std::cout<<" , b["<<(unsigned int)t<<"] = "<<(unsigned int)b[t]<<std::endl;
                     _stats_zero_ops++;
@@ -248,6 +253,7 @@ void node_pu<T>::go() {
             }
 		}
     }
+    //cout<<"$$$$$$$$$$$$$$$$"<<endl;
     for(uint8_t t=0;t<_threads;t++){
         if((th_op_arr[t] != -2) && (th_op_arr[t] != -1) && th_valid_arr[t]){
 			//assert(th_op_arr[t] == -1);
@@ -414,7 +420,7 @@ template <typename T>
 void node_pu<T>::release() {
     for (uint8_t t=0; t<_threads; t++){
         _halt[t] = false;
-        _LRU[t] = 0;
+        _sched[t] = 0;
     }
 }
 
@@ -459,16 +465,33 @@ T node_pu<T>::saturation_op(T a, T b, bool mult)
     return (T)temp_res;
 }
 template <typename T>
-void node_pu<T>::check_and_reset_LRU(){
+void node_pu<T>::check_and_reset_sched(){
     bool th_valid;
     for (uint8_t t=0; t<_threads; t++) {
         th_valid =is_valid(t) && !is_halt(t) && is_ready_out(t);
-        if((_LRU[t] == 0) && th_valid) { // we have a thread to execute
+        if((_sched[t] == 0) && th_valid) { // we have a thread to execute
             return;
         }
     }
     // we don't have a thread to execute - resetting LRU
     //std::cout<<" $$$$$$$$$$ Resetting LRU"<<std::endl;
-    for (uint8_t t=0; t<_threads; t++) _LRU[t] = 0;
+    for (uint8_t t=0; t<_threads; t++) _sched[t] = 0;
 }
+/*template <typename T>
+uint8_t node_pu<T>::choose_thread(){
+    int max_size = _max_depth*2;
+    uint8_t thread = 0;
+    for (uint8_t t=0; t<_threads; t++) {
+        if(_sched[t] != 0) continue;
+        //if(!(is_valid(t) && !is_halt(t) && is_ready_out(t))) continue;
+        int cur_size = _buf_a[t].size() + _buf_b[t].size();
+		if(cur_size <= max_size){
+			max_size = cur_size;
+            thread = t;
+        }
+	}
+    //cout<<"scheduling thread"<<(int)thread<<endl;
+    _sched[thread] = 1;
+    return thread;
+}*/
 #endif
