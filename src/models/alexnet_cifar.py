@@ -12,6 +12,7 @@ class AlexNet(SimModel):
         self.relu = nn.ReLU()
         self.maxpool1 = nn.MaxPool2d(kernel_size=2)
         self.maxpool2 = nn.MaxPool2d(kernel_size=3, stride=2)
+        sa_smt_sim = False
         if not sa_smt_sim :
             self.conv1 = UnfoldConv2d(3, 64, kernel_size=3, stride=1, padding=2)
             self.conv2 = UnfoldConv2d(64, 192, kernel_size=3, padding=2)

@@ -63,10 +63,11 @@ class TestSa(TestCase):
 
         zero_per = self.zero_per/100
         if(self.run_saved_mats):
-            a = np.load("{}/{}.npz".format(self.saved_a_mat_path))
-            b = np.load("{}/{}.npz".format(self.saved_b_mat_path))
-            (a_w,a_h,a_c) = a.size()
-            (b_w,b_h) = b.size()
+            a = np.load("{}".format(self.saved_a_mat_path))['arr_0']
+            b = np.load("{}".format(self.saved_b_mat_path))['arr_0']
+            print(a)
+            (a_w,a_h,a_c) = (50,50,50)
+            (b_w,b_h) = (50,50)
 
         else:
             a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_c)).astype(np.float32)
@@ -77,7 +78,9 @@ class TestSa(TestCase):
         b_num_zeros = int(zero_per * b_w * b_h )
         b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
         b.ravel()[b_zero_indices] = 0
- 
+
+        a_uint8, a_delta = uniform_quantization_a(a)
+        b_int8,b_delta = uniform_quantization_b(b)
 
         if(run_pre_saved_configs):
             max_depth_opts = [1,5,10,20,50,100]
@@ -111,8 +114,6 @@ class TestSa(TestCase):
             np.set_printoptions(suppress=True)
 
            
-            a_uint8, a_delta = uniform_quantization_a(a)
-            b_int8,b_delta = uniform_quantization_b(b)
             base_line_test_output = m.run_int8(dim,1,1,1000,a_uint8,b_int8,True,False,False)
             for test_config in test_configs_list:
                 max_depth = test_config[0]
@@ -244,8 +245,6 @@ class TestSa(TestCase):
             np.set_printoptions(suppress=True)
 
  
-            a_uint8, a_delta = uniform_quantization_a(a)
-            b_int8,b_delta = uniform_quantization_b(b)
             base_line_test_output = m.run_int8(3,1,1,1000,a_uint8,b_int8,True,False,False)
             for test_config in test_configs_list:
                 max_depth = test_config[0]
@@ -420,7 +419,7 @@ if __name__ == '__main__':
     parser.add_argument('--a_c', type=int,default=50, help='a channels')
     parser.add_argument('--b_h', type=int,default=50, help='b height')
     parser.add_argument('--run_saved_mats', type=int,default=0, help='run a saved np array')
-    parser.add_argument('--saved_b_mat_path', type=str ,default='./src/cpy_smt_sa/tests/a_b_mats/b_mat_classifier.4.npz', help='path')
+    parser.add_argument('--saved_b_mat_path', type=str ,default='./src/cpy_smt_sa/tests/a_b_mats/b_mat_classifier.0.npz', help='path')
     parser.add_argument('--saved_a_mat_path', type=str ,default='./src/cpy_smt_sa/tests/a_b_mats/CIFAR100_a_mat.npz', help='path')
     parser.add_argument('--zero_per', type=int,default=10, help='% of zeros in a and b arrays - o to 100')
     parser.add_argument('--run_parallel', action='store_true',
