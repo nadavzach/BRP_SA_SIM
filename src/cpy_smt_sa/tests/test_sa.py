@@ -61,8 +61,22 @@ class TestSa(TestCase):
         b_h = self.b_h 
 
         zero_per = self.zero_per/100
+        if(self.run_saved_mats):
+            a = np.load("{}/{}.npz".format(self.saved_a_mat_path))
+            b = np.load("{}/{}.npz".format(self.saved_b_mat_path))
+            (a_w,a_h,a_c) = a.size()
+            (b_w,b_h) = b.size()
 
-        
+        else:
+            a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_c)).astype(np.float32)
+            b = np.random.uniform(low=-20.0,high=20.0,size = (b_w,b_h)).astype(np.float32)
+        a_num_zeros = int(zero_per * a_w * a_h * a_c)
+        a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
+        a.ravel()[a_zero_indices] = 0
+        b_num_zeros = int(zero_per * b_w * b_h )
+        b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
+        b.ravel()[b_zero_indices] = 0
+ 
 
         if(run_pre_saved_configs):
             max_depth_opts = [1,5,10,20,50,100]
@@ -90,20 +104,12 @@ class TestSa(TestCase):
             print(" b is of size ("+str(b_w)+" x "+str(b_h)+")\n")
             print(" the systolic array is of size (" +str(dim) +" x " + str(dim)+")\n ")
             print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
-            a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_c)).astype(np.float32)
-            b = np.random.uniform(low=-20.0,high=20.0,size = (b_w,b_h)).astype(np.float32)
             
             # This is for Python to print floats in a readable way
             np.set_printoptions(precision=3)
             np.set_printoptions(suppress=True)
 
-            a_num_zeros = int(zero_per * a_w * a_h * a_c)
-            a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
-            a.ravel()[a_zero_indices] = 0
-            b_num_zeros = int(zero_per * b_w * b_h )
-            b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
-            b.ravel()[b_zero_indices] = 0
-            
+           
             a_uint8, a_delta = uniform_quantization_a(a)
             b_int8,b_delta = uniform_quantization_b(b)
             base_line_test_output = m.run_int8(dim,1,1,1000,a_uint8,b_int8,True,False,False)
@@ -230,20 +236,12 @@ class TestSa(TestCase):
             print(" b is of size ("+str(b_w)+" x "+str(b_h)+")\n")
             print(" the systolic array is of size (" +str(dim) +" x " + str(dim)+")\n ")
             print("\n\n\n   --- start running tests from default configurations list ---   \n\n\n")
-            a = np.random.uniform(low=-20.0,high=20.0,size = (a_w,a_h,a_c)).astype(np.float32)
-            b = np.random.uniform(low=-20.0,high=20.0,size = (b_w,b_h)).astype(np.float32)
             
             # This is for Python to print floats in a readable way
             np.set_printoptions(precision=3)
             np.set_printoptions(suppress=True)
 
-            a_num_zeros = int(zero_per * a_w * a_h * a_c)
-            a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
-            a.ravel()[a_zero_indices] = 0
-            b_num_zeros = int(zero_per * b_w * b_h )
-            b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
-            b.ravel()[b_zero_indices] = 0
-            
+ 
             a_uint8, a_delta = uniform_quantization_a(a)
             b_int8,b_delta = uniform_quantization_b(b)
             base_line_test_output = m.run_int8(3,1,1,1000,a_uint8,b_int8,True,False,False)
@@ -283,21 +281,13 @@ class TestSa(TestCase):
             create_excel_table_special(test_output_tuples_list, "pre_saved_configs_test_outputs", './src/cpy_smt_sa/tests/results/') 
         else:
 
-            a = np.random.uniform(low=-50.0,high=50.0,size = (a_w,a_h,a_c)).astype(np.float32)
-            b = np.random.uniform(low=-50.0,high=50.0,size = (b_w,b_h)).astype(np.float32)
+            
             
             # This is for Python to print floats in a readable way
             np.set_printoptions(precision=3)
             np.set_printoptions(suppress=True)
             
-            a_num_zeros = int(zero_per * a_w * a_h * a_c)
-            a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
-            a.ravel()[a_zero_indices] = 0
-            b_num_zeros = int(zero_per * b_w * b_h )
-            b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
-            b.ravel()[b_zero_indices] = 0
-            a_uint8, a_delta = uniform_quantization_a(a)
-            b_int8,b_delta = uniform_quantization_b(b)
+         
             print("running base line test... \n\n")
             base_line_test_output = m.run_int8(dim,1,1,1000,a_uint8,b_int8,True,False,False)
             print("running test for configuration: buffer size= " + str(max_depth) + ", threads num= "+ str(threads) + ", alu num= " + str(alu_num) + ", push back= " + str(enable_pushback) + ", low precision mult= " +str(enable_low_prec_mult)+" \n")
@@ -426,6 +416,9 @@ if __name__ == '__main__':
     parser.add_argument('--a_h', type=int,default=50, help='a height')
     parser.add_argument('--a_c', type=int,default=50, help='a channels')
     parser.add_argument('--b_h', type=int,default=50, help='b height')
+    parser.add_argument('--run_saved_mats', type=int,default=0, help='run a saved np array')
+    parser.add_argument('--saved_b_mat_path', type=str ,default='./src/cpy_smt_sa/tests/a_b_mats/b_mat_classifier.4.npz', help='path')
+    parser.add_argument('--saved_a_mat_path', type=str ,default='./src/cpy_smt_sa/tests/a_b_mats/CIFAR100_a_mat.npz', help='path')
     parser.add_argument('--zero_per', type=int,default=10, help='% of zeros in a and b arrays - o to 100')
     parser.add_argument('--run_parallel', action='store_true',
                     help='run simulation on multiple OS threads (default: False)', default=False)
@@ -444,6 +437,9 @@ if __name__ == '__main__':
     testSa_obj.a_c = args.a_c
     testSa_obj.b_h = args.b_h
     testSa_obj.zero_per = args.zero_per
+    testSa_obj.run_saved_mats = args.run_saved_mats
+    testSa_obj.saved_b_mat_path = args.saved_b_mat_path
+    testSa_obj.saved_a_mat_path = args.saved_a_mat_path
     testSa_obj.run_parallel = args.run_parallel
     #unittest.main()
     testSa_obj.test_brp_sa()

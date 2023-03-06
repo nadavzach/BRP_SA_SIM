@@ -5,6 +5,7 @@ import cpy_smt_sa as m
 import numpy as np
 
 
+
 class RoundSTE(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input):
@@ -351,8 +352,42 @@ class UnfoldConv2d(nn.Module):
                         print("stats_alu_not_utilized %         :  " +str(100*stats_alu_not_utilized/stats_alu_total ))
                         print(" $$$$$$$$ HW_SIM CPY_SMT_SA !END! $$$$$$$$$")
                     else: # no hw simulation
+
+                        print(" $$$$$$$$ saving a and b $$$$$$$$$")
                         out_unf = x_unf.matmul(w_unf).transpose(1, 2)
                         out = nn.functional.fold(out_unf, (ofmap_height, ofmap_width), (1, 1))
+                        a_w = 50
+                        a_h = 50
+                        a_c = 50
+                        b_w = a_c
+                        b_h = 50
+                        mean = np.mean(x_unf)
+                        variance = np.var(x_unf)
+                        zero_percent = np.count_nonzero(x_unf == 0) / np.prod(x_unf.shape)
+                        values = np.random.normal(loc=mean,scale= np.sqrt(variance),size= (a_w*a_h*a_c))
+                        values = np.reshape(values,(a_w,a_h,a_c))
+
+                        a_num_zeros = int(zero_percent * a_w * a_h*a_c )
+                        a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
+                        values.ravel()[a_zero_indices] = 0
+                        new_zero_per = np.count_nonzero(values == 0) / np.prod(values.shape)
+                        print("calc zero per = "+str(zero_percent)+", new zero per is "+str(new_zero_per)+" \n")
+
+                        np.savez_compressed("{}/{}.npz".format('./src/cpy_smt/test/a_b_mats', 'a_mat'+str(self._get_name())), values)
+                        mean = np.mean(w_unf)
+                        variance = np.var(w_unf)
+                        zero_percent = np.count_nonzero(w_unf == 0) / np.prod(w_unf.shape)
+                        values = np.random.normal(loc=mean,scale= np.sqrt(variance),size= (b_w*b_h))
+                        values = np.reshape(values,(b_w,b_h))
+
+                        b_num_zeros = int(zero_percent * b_w * b_h )
+                        b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
+                        values.ravel()[a_zero_indices] = 0
+                        new_zero_per = np.count_nonzero(values == 0) / np.prod(values.shape)
+                        print("calc zero per = "+str(zero_percent)+", new zero per is "+str(new_zero_per)+" \n")
+
+                        np.savez_compressed("{}/{}.npz".format('./src/cpy_smt/test/a_b_mats', 'b_mat'+str(self._get_name())), values)
+ 
 
                         if bias_fp is None:
                             bias_fp = 0

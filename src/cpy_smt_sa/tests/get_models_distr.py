@@ -39,22 +39,23 @@ if __name__ == '__main__':
     variance = np.var(cifar100.data / 255, axis=(0, 1, 2))
     variance = np.mean(variance)
     zero_percent = np.count_nonzero(cifar100.data == 0) / np.prod(cifar100.data.shape)
-    print("done! saving b matrix in \n")
+    print("done! saving a matrix in \n")
 
-    values = np.random.normal(loc=mean,scale= np.sqrt(variance), size=b_w*b_h)
-    values = np.reshape(values,(b_w,b_h))
-    b_num_zeros = int(zero_percent * b_w * b_h )
-    b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
-    values.ravel()[b_zero_indices] = 0
+    values = np.random.normal(loc=mean,scale= np.sqrt(variance),size= (a_w*a_h*a_c))
+    values = np.reshape(values,(a_w,a_h,a_c))
+
+    a_num_zeros = int(zero_percent * a_w * a_h*a_c )
+    a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
+    values.ravel()[a_zero_indices] = 0
     new_zero_per = np.count_nonzero(values == 0) / np.prod(values.shape)
     print("calc zero per = "+str(zero_percent)+", new zero per is "+str(new_zero_per)+" \n")
 
-    np.savez_compressed("{}/{}.npz".format(path, 'CIFAR100_b_mat'), values)
-
+    np.savez_compressed("{}/{}.npz".format(path, 'CIFAR100_a_mat'), values)
+ 
 
     print("done! loading alexnet and mobilenet v3 small... \n")
     # Load the pre-trained AlexNet model
-    models = [models.alexnet(pretrained=True),models.mobilenet_v3_small]
+    models = [models.alexnet(pretrained=True),models.mobilenet_v3_small(pretrained=True)]
 
 
     print("done! claculating mean var and zero% for each... \n")
@@ -68,17 +69,19 @@ if __name__ == '__main__':
                 # Calculate the mean and variance of the layer's weights
                 mean = torch.mean(module.weight.data)
                 variance = torch.var(module.weight.data)
-                zero_per = 100*np.count_nonzero(module.weight.data == 0)/np.prod(module.weight.data.size())
+                zero_percent = 100*np.count_nonzero(module.weight.data == 0)/np.prod(module.weight.data.size())
                 print("Layer {}: Mean={}, Variance={}".format(name, mean, variance))
-                values = np.random.normal(loc=mean,scale= np.sqrt(variance),size= (a_w*a_h*a_c))
-                values = np.reshape(values,(a_w,a_h,a_c))
-                a_num_zeros = int(zero_percent * a_w * a_h*a_c )
-                a_zero_indices = np.random.choice(a_w * a_h*a_c, a_num_zeros, replace=False)
-                values.ravel()[a_zero_indices] = 0
+                values = np.random.normal(loc=mean,scale= np.sqrt(variance), size=b_w*b_h)
+                values = np.reshape(values,(b_w,b_h))
+                b_num_zeros = int(zero_percent * b_w * b_h )
+                b_zero_indices = np.random.choice(b_w * b_h, b_num_zeros, replace=False)
+                values.ravel()[b_zero_indices] = 0
                 new_zero_per = np.count_nonzero(values == 0) / np.prod(values.shape)
                 print("calc zero per = "+str(zero_percent)+", new zero per is "+str(new_zero_per)+" \n")
-                np.savez_compressed("{}/{}.npz".format(path, 'a_mat_'+name), values)
-    
+
+                np.savez_compressed("{}/{}.npz".format(path, 'b_mat_'+name), values)
+
+   
 
 
 
