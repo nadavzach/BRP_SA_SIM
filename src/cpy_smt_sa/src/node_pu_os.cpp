@@ -77,6 +77,7 @@ public:
 	void peek(T& x,bool& is_empty, bool buf, uint8_t thread);
 	bool try_pushback(uint8_t thread);
     uint8_t choose_thread();
+    void check_thread_pushback();
 };
 
 template <typename T>
@@ -189,6 +190,8 @@ void node_pu<T>::go() {
     for (uint8_t i=0; i<_alu_num; i++) {
 		alu_ocp_arr[i] = -1;
 	}
+    if(_scheduler == 3)
+        check_thread_pushback();
     if(_scheduler != 0)
         check_and_reset_sched();
     for (uint8_t t=0; t<_threads; t++) {
@@ -473,9 +476,24 @@ void node_pu<T>::check_and_reset_sched(){
             return;
         }
     }
+    if(_scheduler == 3){
+        for (uint8_t t=0; t<_threads; t++) _sched[t]--;
+        for (uint8_t t=0; t<_threads; t++) {
+            th_valid =is_valid(t) && !is_halt(t) && is_ready_out(t);
+            if((_sched[t] == 0) && th_valid) { // we have a thread to execute
+                return;
+            }
+        }
+    }
     // we don't have a thread to execute - resetting LRU
     //std::cout<<" $$$$$$$$$$ Resetting LRU"<<std::endl;
     for (uint8_t t=0; t<_threads; t++) _sched[t] = 0;
+}
+template <typename T>
+void node_pu<T>::check_thread_pushback(){
+    for (uint8_t t=0; t<_threads; t++) {
+        if(try_pushback(t)) _sched[t]++;
+    }
 }
 /*template <typename T>
 uint8_t node_pu<T>::choose_thread(){

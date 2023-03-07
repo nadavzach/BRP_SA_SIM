@@ -66,6 +66,8 @@ class TestSa(TestCase):
             a = np.load("{}".format(self.saved_a_mat_path))['arr_0']
             b = np.load("{}".format(self.saved_b_mat_path))['arr_0']
             print(a)
+            print("\n")
+            print(b)
             (a_w,a_h,a_c) = (50,50,50)
             (b_w,b_h) = (50,50)
 
@@ -83,7 +85,7 @@ class TestSa(TestCase):
         b_int8,b_delta = uniform_quantization_b(b)
 
         if(run_pre_saved_configs):
-            max_depth_opts = [1,5,10,20,50,100]
+            max_depth_opts = [50,100,200,500,700,1000]
             threads_opts = [1,2,4]
             alu_num_opts = [1,2]
             pushback_opts = [True,False]
@@ -320,7 +322,7 @@ class TestSa(TestCase):
             print("stats_zero_ops %                 :  " +str(100*stats_zero_ops/stats_ops_total             ))
             print("stats_1thread_mult_ops %         :  " +str(100*stats_1thread_mult_ops/stats_ops_total     ))
             print("stats_multi_thread_mult_ops %    :  " +str(100*threads*stats_multi_thread_mult_ops/stats_ops_total ))
-            print("stats_total_thread_mult_ops %    :  " +str(stats_ops_total ))
+            print("stats_total_ops                  :  " +str(stats_ops_total ))
             print("stats_buffer_fullness_acc        :  " +str(stats_buffer_fullness_acc  ))
             print("stats_buffer_max_fullness        :  " +str(stats_buffer_max_fullness  ))
             print("MSE from base line               :  " +str(mse_from_base_line  ))
